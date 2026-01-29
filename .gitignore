@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Shortcuts (may contain personal device info)
+*.shortcut
+
+# Config files with personal info
+config.toml
+.apple-cli/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
