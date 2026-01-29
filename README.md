@@ -1,10 +1,10 @@
-# apple-cli
+# macjuice
 
 A unified command-line interface for interacting with Apple apps on macOS via AppleScript.
 
 ## Overview
 
-`apple-cli` provides a simple, consistent CLI to interact with native macOS applications:
+`macjuice` provides a simple, consistent CLI to interact with native macOS applications:
 
 - **Mail** - Search, read, send, and organize emails across all accounts (Exchange, Office 365, Gmail, etc.)
 - **Notes** - Create, list, search, and read notes
@@ -21,10 +21,10 @@ A unified command-line interface for interacting with Apple apps on macOS via Ap
 
 ```bash
 # Clone the repo
-git clone https://github.com/andrewfurman/apple-cli.git
-cd apple-cli
+git clone https://github.com/andrewfurman/macjuice.git
+cd macjuice
 
-# Install (adds `apple` command to your PATH)
+# Install (adds `macjuice` command to your PATH)
 ./install.sh
 ```
 
@@ -32,59 +32,59 @@ cd apple-cli
 
 ```bash
 # Mail
-apple mail list                          # List recent emails
-apple mail search "from:boss subject:urgent"
-apple mail send "user@example.com" "Subject" "Body"
-apple mail accounts                      # List all mail accounts
+macjuice mail list                          # List recent emails
+macjuice mail search "from:boss subject:urgent"
+macjuice mail send "user@example.com" "Subject" "Body"
+macjuice mail accounts                      # List all mail accounts
 
 # Notes
-apple notes list                         # List all notes
-apple notes create "Title" "Content"
-apple notes search "meeting"
-apple notes read "Note Title"
+macjuice notes list                         # List all notes
+macjuice notes create "Title" "Content"
+macjuice notes search "meeting"
+macjuice notes read "Note Title"
 
 # Calendar
-apple calendar today                     # Today's events
-apple calendar week                      # This week's events
-apple calendar create "Meeting" "2024-02-01 10:00" "1 hour"
-apple calendar list                      # List all calendars
+macjuice calendar today                     # Today's events
+macjuice calendar week                      # This week's events
+macjuice calendar create "Meeting" "2024-02-01 10:00" "1 hour"
+macjuice calendar list                      # List all calendars
 
 # Messages
-apple messages send "+15551234567" "Hello!"
-apple messages list                      # Recent conversations
-apple messages read "John Doe"           # Messages from contact
+macjuice messages send "+15551234567" "Hello!"
+macjuice messages list                      # Recent conversations
+macjuice messages read "John Doe"           # Messages from contact
 
 # Music
-apple music play
-apple music pause
-apple music next
-apple music now                          # Current track info
-apple music search "artist:Beatles"
+macjuice music play
+macjuice music pause
+macjuice music next
+macjuice music now                          # Current track info
+macjuice music search "artist:Beatles"
 
 # Photos
-apple photos albums                      # List all albums
-apple photos list "Album Name"           # Photos in album
-apple photos export "Album Name" ~/Desktop/export
+macjuice photos albums                      # List all albums
+macjuice photos list "Album Name"           # Photos in album
+macjuice photos export "Album Name" ~/Desktop/export
 
 # Reminders
-apple reminders list
-apple reminders create "Buy groceries" --due "tomorrow 5pm"
-apple reminders complete "Buy groceries"
+macjuice reminders list
+macjuice reminders create "Buy groceries" --due "tomorrow 5pm"
+macjuice reminders complete "Buy groceries"
 
 # Contacts
-apple contacts search "John"
-apple contacts show "John Doe"
+macjuice contacts search "John"
+macjuice contacts show "John Doe"
 
 # Home (HomeKit via Shortcuts)
-apple home setup                         # Install preloaded shortcuts
-apple home list                          # List available scenes/devices
-apple home run "Good Night"              # Run a scene
-apple home "Living Room Lights" off
-apple home "Thermostat" 72
+macjuice home setup                         # Install preloaded shortcuts
+macjuice home list                          # List available scenes/devices
+macjuice home run "Good Night"              # Run a scene
+macjuice home "Living Room Lights" off
+macjuice home "Thermostat" 72
 
 # FaceTime
-apple facetime "+15551234567"            # Start video call
-apple facetime "user@icloud.com" --audio # Audio only
+macjuice facetime "+15551234567"            # Start video call
+macjuice facetime "user@icloud.com" --audio # Audio only
 ```
 
 ## How It Works
@@ -113,7 +113,7 @@ The CLI invokes these scripts via `osascript` and parses the output.
 Apple's Home app has **no AppleScript support**. We work around this using macOS Shortcuts:
 
 1. **Preloaded Shortcuts**: The `scripts/shortcuts/` folder contains `.shortcut` files for common HomeKit actions
-2. **Auto-Install**: Running `apple home setup` imports these shortcuts into your Shortcuts app
+2. **Auto-Install**: Running `macjuice home setup` imports these shortcuts into your Shortcuts app
 3. **CLI Invocation**: The CLI calls shortcuts via the `shortcuts` command-line tool
 
 #### Preloaded Shortcuts
@@ -135,11 +135,11 @@ You can add your own HomeKit shortcuts:
 
 1. Create the shortcut in Shortcuts.app with your HomeKit actions
 2. Export it: `shortcuts export "My Shortcut" -o scripts/shortcuts/`
-3. The CLI will detect and use it: `apple home run "My Shortcut"`
+3. The CLI will detect and use it: `macjuice home run "My Shortcut"`
 
 #### How Shortcut Auto-Install Works
 
-When you run `apple home setup`, the CLI:
+When you run `macjuice home setup`, the CLI:
 
 1. Scans `scripts/shortcuts/` for `.shortcut` files
 2. Signs each shortcut (required by macOS)
@@ -147,7 +147,7 @@ When you run `apple home setup`, the CLI:
 4. Verifies installation with `shortcuts list`
 
 ```bash
-$ apple home setup
+$ macjuice home setup
 Installing HomeKit shortcuts...
   ✓ homekit-lights-on
   ✓ homekit-lights-off
@@ -156,25 +156,25 @@ Installing HomeKit shortcuts...
   ✓ homekit-thermostat-set
   ✓ homekit-lock-doors
   ✓ homekit-scene-runner
-Done! Run 'apple home list' to see available commands.
+Done! Run 'macjuice home list' to see available commands.
 ```
 
 ## Output Formats
 
 ```bash
 # Default: Human-readable
-apple mail list
+macjuice mail list
 
 # JSON output (for scripting)
-apple mail list --json
+macjuice mail list --json
 
 # Quiet mode (minimal output)
-apple mail send "user@example.com" "Subject" "Body" --quiet
+macjuice mail send "user@example.com" "Subject" "Body" --quiet
 ```
 
 ## Configuration
 
-Optional config file at `~/.apple-cli/config.toml`:
+Optional config file at `~/.macjuice/config.toml`:
 
 ```toml
 [mail]
@@ -208,10 +208,10 @@ On first run, macOS will prompt for permissions. Grant access to:
 ## Project Structure
 
 ```
-apple-cli/
+macjuice/
 ├── README.md
 ├── install.sh
-├── apple                    # Main CLI entry point (bash or python)
+├── macjuice                 # Main CLI entry point (bash or python)
 ├── scripts/
 │   ├── mail.applescript
 │   ├── notes.applescript
