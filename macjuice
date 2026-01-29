@@ -1,0 +1,256 @@
+#!/bin/bash
+# macjuice - A unified CLI for interacting with Apple apps on macOS
+# https://github.com/andrewfurman/macjuice
+
+set -e
+
+# Get the directory where macjuice is installed
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPTS_DIR="$SCRIPT_DIR/scripts"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Version
+VERSION="0.1.0"
+
+# Show help
+show_help() {
+    echo -e "${CYAN}macjuice${NC} v$VERSION - CLI for Apple apps on macOS"
+    echo ""
+    echo "Usage: macjuice <app> <command> [args...]"
+    echo ""
+    echo -e "${YELLOW}Available apps:${NC}"
+    echo "  mail        Search, read, send emails"
+    echo "  notes       Create, list, search notes"
+    echo "  calendar    View and create events"
+    echo "  messages    Send and read iMessages"
+    echo "  music       Control Apple Music playback"
+    echo "  contacts    Search and manage contacts"
+    echo "  reminders   Manage reminders and tasks"
+    echo "  home        Control HomeKit devices"
+    echo ""
+    echo -e "${YELLOW}Examples:${NC}"
+    echo "  macjuice mail accounts"
+    echo "  macjuice mail search \"from:boss\""
+    echo "  macjuice notes create \"Title\" \"Content\""
+    echo "  macjuice calendar today"
+    echo "  macjuice messages send \"+15551234567\" \"Hello!\""
+    echo "  macjuice music now"
+    echo "  macjuice contacts search \"John\""
+    echo "  macjuice reminders add \"Buy milk\" \"Groceries\""
+    echo "  macjuice home run \"Good Night\""
+    echo ""
+    echo -e "${YELLOW}Options:${NC}"
+    echo "  --help, -h     Show this help message"
+    echo "  --version, -v  Show version"
+    echo ""
+    echo "For app-specific help: macjuice <app> --help"
+}
+
+# Show version
+show_version() {
+    echo "macjuice v$VERSION"
+}
+
+# Run an AppleScript
+run_applescript() {
+    local script="$1"
+    shift
+    local script_path="$SCRIPTS_DIR/$script.applescript"
+
+    if [[ ! -f "$script_path" ]]; then
+        echo -e "${RED}Error:${NC} Script not found: $script_path" >&2
+        exit 1
+    fi
+
+    osascript "$script_path" "$@"
+}
+
+# Show app-specific help
+show_app_help() {
+    local app="$1"
+
+    case "$app" in
+        mail)
+            echo -e "${CYAN}macjuice mail${NC} - Email management"
+            echo ""
+            echo "Commands:"
+            echo "  accounts              List all mail accounts"
+            echo "  list [mailbox]        List recent emails (default: INBOX)"
+            echo "  search <query>        Search emails"
+            echo "  read <message-id>     Read a specific email"
+            echo "  send <to> <subj> <body>  Send an email"
+            ;;
+        notes)
+            echo -e "${CYAN}macjuice notes${NC} - Notes management"
+            echo ""
+            echo "Commands:"
+            echo "  list                  List all notes"
+            echo "  folders               List all folders"
+            echo "  create <title> <body> Create a new note"
+            echo "  read <title>          Read a note"
+            echo "  search <query>        Search notes"
+            ;;
+        calendar)
+            echo -e "${CYAN}macjuice calendar${NC} - Calendar management"
+            echo ""
+            echo "Commands:"
+            echo "  list                  List all calendars"
+            echo "  today                 Show today's events"
+            echo "  week                  Show this week's events"
+            echo "  upcoming [days]       Show upcoming events (default: 7 days)"
+            echo "  search <query>        Search events"
+            echo "  create <title> <date> <duration> [calendar]"
+            echo "                        Create an event"
+            echo "  delete <title>        Delete an event"
+            ;;
+        messages)
+            echo -e "${CYAN}macjuice messages${NC} - iMessage/SMS"
+            echo ""
+            echo "Commands:"
+            echo "  chats                 List all chats"
+            echo "  send <to> <message>   Send a message"
+            echo "  read <chat> [count]   Read messages from a chat"
+            echo "  recent [count]        Show recent messages"
+            echo "  search <query>        Search messages"
+            ;;
+        music)
+            echo -e "${CYAN}macjuice music${NC} - Apple Music control"
+            echo ""
+            echo "Commands:"
+            echo "  play                  Start playback"
+            echo "  pause                 Pause playback"
+            echo "  toggle                Toggle play/pause"
+            echo "  next                  Next track"
+            echo "  previous              Previous track"
+            echo "  now                   Show current track"
+            echo "  volume [level]        Get/set volume (0-100)"
+            echo "  playlists             List playlists"
+            echo "  search <query>        Search library"
+            ;;
+        contacts)
+            echo -e "${CYAN}macjuice contacts${NC} - Contacts management"
+            echo ""
+            echo "Commands:"
+            echo "  list                  List contacts"
+            echo "  search <query>        Search contacts"
+            echo "  show <name>           Show contact details"
+            echo "  groups                List contact groups"
+            echo "  add <first> <last> [email] [phone]"
+            echo "                        Add a new contact"
+            echo "  email <name>          Get contact's email"
+            echo "  phone <name>          Get contact's phone"
+            ;;
+        reminders)
+            echo -e "${CYAN}macjuice reminders${NC} - Reminders management"
+            echo ""
+            echo "Commands:"
+            echo "  lists                 List all reminder lists"
+            echo "  list [listname]       List reminders in a list"
+            echo "  all                   List all incomplete reminders"
+            echo "  today                 List reminders due today"
+            echo "  overdue               List overdue reminders"
+            echo "  add <title> [list] [due]"
+            echo "                        Add a reminder"
+            echo "  complete <title>      Mark reminder as complete"
+            echo "  delete <title>        Delete a reminder"
+            echo "  search <query>        Search reminders"
+            ;;
+        home)
+            echo -e "${CYAN}macjuice home${NC} - HomeKit control (via Shortcuts)"
+            echo ""
+            echo "Commands:"
+            echo "  list                  List HomeKit shortcuts"
+            echo "  run <shortcut>        Run a HomeKit shortcut"
+            echo "  setup                 Set up HomeKit shortcuts"
+            echo ""
+            echo "Note: HomeKit requires Shortcuts. Run 'macjuice home setup' first."
+            ;;
+        *)
+            echo -e "${RED}Error:${NC} Unknown app: $app"
+            echo "Run 'macjuice --help' for available apps."
+            exit 1
+            ;;
+    esac
+}
+
+# Main entry point
+main() {
+    # Handle no arguments
+    if [[ $# -eq 0 ]]; then
+        show_help
+        exit 0
+    fi
+
+    # Handle global flags
+    case "$1" in
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        --version|-v)
+            show_version
+            exit 0
+            ;;
+    esac
+
+    # Get the app name
+    local app="$1"
+    shift
+
+    # Handle app-specific help
+    if [[ $# -eq 0 ]] || [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+        show_app_help "$app"
+        exit 0
+    fi
+
+    # Get the command
+    local cmd="$1"
+    shift
+
+    # Route to the appropriate AppleScript
+    case "$app" in
+        mail|notes|calendar|messages|music|contacts|reminders)
+            run_applescript "$app" "$cmd" "$@"
+            ;;
+        home)
+            if [[ "$cmd" == "setup" ]]; then
+                # Run the setup script
+                bash "$SCRIPTS_DIR/home-setup.sh"
+            else
+                run_applescript "home" "$cmd" "$@"
+            fi
+            ;;
+        facetime)
+            # FaceTime uses URL scheme, not AppleScript
+            case "$cmd" in
+                call|video)
+                    open "facetime://$1"
+                    echo "Opening FaceTime call to $1"
+                    ;;
+                audio)
+                    open "facetime-audio://$1"
+                    echo "Opening FaceTime audio call to $1"
+                    ;;
+                *)
+                    open "facetime://$cmd"
+                    echo "Opening FaceTime call to $cmd"
+                    ;;
+            esac
+            ;;
+        *)
+            echo -e "${RED}Error:${NC} Unknown app: $app"
+            echo "Run 'macjuice --help' for available apps."
+            exit 1
+            ;;
+    esac
+}
+
+# Run main
+main "$@"
