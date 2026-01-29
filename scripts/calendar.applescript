@@ -49,11 +49,13 @@ end run
 -- List all calendars
 on listCalendars()
     tell application "Calendar"
+        with timeout of 5 seconds
         set output to {}
         repeat with cal in calendars
-            set calInfo to (name of cal) & " [" & (uid of cal) & "]"
+            set calInfo to (name of cal) & " [" & (name of cal) & "]"
             set end of output to calInfo
         end repeat
+        end timeout
     end tell
     return my joinList(output, linefeed)
 end listCalendars
@@ -88,6 +90,7 @@ end upcomingEvents
 -- Get events in a date range
 on getEventsInRange(startDate, endDate)
     tell application "Calendar"
+        with timeout of 5 seconds
         set output to {}
 
         repeat with cal in calendars
@@ -121,7 +124,7 @@ on getEventsInRange(startDate, endDate)
                     end try
 
                     set evtLine to timeStr & " | " & evtTitle & " (" & durationStr & ")" & locStr & " [" & (name of cal) & "]"
-                    set end of output to {startDate:evtStart, line:evtLine}
+                    set end of output to {startDate:evtStart, eventLine:evtLine}
                 end repeat
             end try
         end repeat
@@ -129,22 +132,24 @@ on getEventsInRange(startDate, endDate)
         -- Sort by date (simple bubble sort)
         set sortedOutput to my sortEventsByDate(output)
 
-        -- Extract just the lines
-        set lines to {}
+        -- Extract just the display strings
+        set outputLines to {}
         repeat with item_ref in sortedOutput
-            set end of lines to line of item_ref
+            set end of outputLines to eventLine of item_ref
         end repeat
 
-        if (count of lines) is 0 then
+        if (count of outputLines) is 0 then
             return "No events found"
         end if
+        end timeout
     end tell
-    return my joinList(lines, linefeed)
+    return my joinList(outputLines, linefeed)
 end getEventsInRange
 
 -- Search events by title
 on searchEvents(query)
     tell application "Calendar"
+        with timeout of 5 seconds
         set output to {}
         set maxResults to 20
         set searchStart to current date
@@ -168,6 +173,7 @@ on searchEvents(query)
         if (count of output) is 0 then
             return "No events found matching: " & query
         end if
+        end timeout
     end tell
     return my joinList(output, linefeed)
 end searchEvents
@@ -175,6 +181,7 @@ end searchEvents
 -- Create a new event
 on createEvent(eventTitle, eventDateStr, durationStr, calendarName)
     tell application "Calendar"
+        with timeout of 10 seconds
         -- Find the calendar
         set targetCal to missing value
         repeat with cal in calendars
@@ -202,12 +209,14 @@ on createEvent(eventTitle, eventDateStr, durationStr, calendarName)
         end tell
 
         return "OK: Created '" & eventTitle & "' on " & (eventDate as text) & " in " & (name of targetCal)
+        end timeout
     end tell
 end createEvent
 
 -- Delete an event by title (deletes first match today or future)
 on deleteEvent(eventTitle)
     tell application "Calendar"
+        with timeout of 10 seconds
         set todayStart to current date
         set time of todayStart to 0
 
@@ -224,6 +233,7 @@ on deleteEvent(eventTitle)
         end repeat
 
         return "Event not found: " & eventTitle
+        end timeout
     end tell
 end deleteEvent
 
