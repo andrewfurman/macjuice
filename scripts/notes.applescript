@@ -47,7 +47,7 @@ on listNotes()
             set end of output to noteInfo
         end repeat
 
-        return joinList(output, linefeed)
+        return my joinList(output, linefeed)
     end tell
 end listNotes
 
@@ -59,7 +59,7 @@ on listFolders()
             set folderInfo to (name of f) & " (" & (count of notes in f) & " notes)"
             set end of output to folderInfo
         end repeat
-        return joinList(output, linefeed)
+        return my joinList(output, linefeed)
     end tell
 end listFolders
 
@@ -97,16 +97,20 @@ on searchNotes(query)
 
         repeat with n in notes
             if (count of output) ≥ maxResults then exit repeat
-            if (name of n) contains query or (plaintext of n) contains query then
-                set noteInfo to (name of n) & " | " & (modification date of n as text)
-                set end of output to noteInfo
-            end if
+            try
+                with timeout of 3 seconds
+                    if (name of n) contains query or (plaintext of n) contains query then
+                        set noteInfo to (name of n) & " | " & (modification date of n as text)
+                        set end of output to noteInfo
+                    end if
+                end timeout
+            end try
         end repeat
 
         if (count of output) is 0 then
             return "No notes found matching: " & query
         end if
-        return joinList(output, linefeed)
+        return my joinList(output, linefeed)
     end tell
 end searchNotes
 

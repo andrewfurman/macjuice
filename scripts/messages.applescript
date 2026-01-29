@@ -200,34 +200,35 @@ on recentMessages(msgCount)
 
         repeat with c in chats
             if collected ≥ msgCount then exit repeat
-
-            set chatName to name of c
-            if chatName is missing value then
-                set chatParticipants to participants of c
-                if (count of chatParticipants) > 0 then
-                    set chatName to name of item 1 of chatParticipants
-                else
-                    set chatName to "Unknown"
-                end if
-            end if
-
-            set chatMessages to messages of c
-            set msgTotal to count of chatMessages
-            if msgTotal > 0 then
-                -- Get last message from this chat
-                set msg to item msgTotal of chatMessages
-                set msgDate to date sent of msg
-                set msgText to text of msg
-
-                -- Truncate long messages
-                if (length of msgText) > 50 then
-                    set msgText to (text 1 thru 50 of msgText) & "..."
+            try
+                set chatName to name of c
+                if chatName is missing value then
+                    set chatParticipants to participants of c
+                    if (count of chatParticipants) > 0 then
+                        set chatName to name of item 1 of chatParticipants
+                    else
+                        set chatName to "Unknown"
+                    end if
                 end if
 
-                set msgLine to chatName & " | " & (msgDate as text) & " | " & msgText
-                set end of output to msgLine
-                set collected to collected + 1
-            end if
+                set chatMessages to messages of c
+                set msgTotal to count of chatMessages
+                if msgTotal > 0 then
+                    -- Get last message from this chat
+                    set msg to item msgTotal of chatMessages
+                    set msgDate to date sent of msg
+                    set msgText to text of msg
+
+                    -- Truncate long messages
+                    if (length of msgText) > 50 then
+                        set msgText to (text 1 thru 50 of msgText) & "..."
+                    end if
+
+                    set msgLine to chatName & " | " & (msgDate as text) & " | " & msgText
+                    set end of output to msgLine
+                    set collected to collected + 1
+                end if
+            end try
         end repeat
     end tell
     return my joinList(output, linefeed)
