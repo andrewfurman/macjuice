@@ -28,4 +28,21 @@ assert_output_matches \
     "(No messages found|.*\|.*\|.*\|)" \
     "$MACJUICE" mail list
 
+# 5. mail draft exits 0
+assert_exit_zero \
+    "mail draft exits 0" \
+    "$MACJUICE" mail draft "test@example.com" "macjuice test draft" "This is an automated test draft from macjuice."
+
+# 6. mail draft output confirms success
+assert_output_matches \
+    "mail draft output confirms draft saved and opened" \
+    "OK: Draft saved and opened in Mail for test@example.com" \
+    "$MACJUICE" mail draft "test@example.com" "macjuice test draft" "This is an automated test draft from macjuice."
+
+# 7. mail draft with missing args shows usage
+assert_output_matches \
+    "mail draft missing args shows usage" \
+    "Usage:" \
+    "$MACJUICE" mail draft
+
 print_summary "Mail"
