@@ -33,6 +33,7 @@ show_help() {
     echo "  music       Control Apple Music playback"
     echo "  contacts    Search and manage contacts"
     echo "  reminders   Manage reminders and tasks"
+    echo "  photos      Search and export photos"
     echo "  shortcuts   Run any macOS Shortcut"
     echo "  home        Control HomeKit devices (via Shortcuts)"
     echo ""
@@ -166,6 +167,16 @@ show_app_help() {
             echo "  delete <title>        Delete a reminder"
             echo "  search <query>        Search reminders"
             ;;
+        photos)
+            echo -e "${CYAN}macjuice photos${NC} - Apple Photos"
+            echo ""
+            echo "Commands:"
+            echo "  recent [count]        List recent photos (default: 20)"
+            echo "  search <query>        Search by filename or description"
+            echo "  albums                List all albums"
+            echo "  export <query> <dir>  Export matching photos to a folder"
+            echo "  export-recent <n> <dir>  Export N recent photos"
+            ;;
         shortcuts)
             echo -e "${CYAN}macjuice shortcuts${NC} - Run macOS Shortcuts"
             echo ""
@@ -235,7 +246,7 @@ main() {
 
     # Route to the appropriate AppleScript
     case "$app" in
-        mail|notes|calendar|messages|music|contacts|reminders|shortcuts)
+        mail|notes|calendar|messages|music|contacts|reminders|photos|shortcuts)
             run_applescript "$app" "$cmd" "$@"
             ;;
         home)
