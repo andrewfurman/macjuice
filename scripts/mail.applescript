@@ -28,6 +28,12 @@ on run argv
         else
             return "Usage: mail.applescript read <message-id>"
         end if
+    else if cmd is "draft" then
+        if (count of argv) > 3 then
+            return draftMessage(item 2 of argv, item 3 of argv, item 4 of argv)
+        else
+            return "Usage: mail.applescript draft <to> <subject> <body>"
+        end if
     else if cmd is "send" then
         if (count of argv) > 3 then
             return sendMessage(item 2 of argv, item 3 of argv, item 4 of argv)
@@ -118,6 +124,18 @@ on readMessage(messageId)
         return "Message not found: " & messageId
     end tell
 end readMessage
+
+-- Create a draft message (saved and opened, not sent)
+on draftMessage(toAddr, subjectText, bodyText)
+    tell application "Mail"
+        set newMessage to make new outgoing message with properties {subject:subjectText, content:bodyText, visible:true}
+        tell newMessage
+            make new to recipient at end of to recipients with properties {address:toAddr}
+        end tell
+        -- Do not send — leave as draft
+        return "OK: Draft saved and opened in Mail for " & toAddr
+    end tell
+end draftMessage
 
 -- Send a new message
 on sendMessage(toAddr, subjectText, bodyText)

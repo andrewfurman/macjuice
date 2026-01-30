@@ -24,11 +24,25 @@ on listHomeShortcuts()
 end listHomeShortcuts
 
 -- Run a HomeKit shortcut by name
+-- Uses Shortcuts Events (AppleScript) instead of `shortcuts run` CLI,
+-- which hangs indefinitely on HomeKit actions.
 on runHomeShortcut(shortcutName)
     try
-        -- First try with homekit- prefix
-        do shell script "shortcuts run 'homekit-" & shortcutName & "' 2>/dev/null || shortcuts run '" & shortcutName & "'"
-        return "OK: Ran " & shortcutName
+        -- Try with homekit- prefix first, fall back to bare name
+        tell application "Shortcuts Events"
+            set allNames to name of every shortcut
+        end tell
+        set fullName to "homekit-" & shortcutName
+        if allNames does not contain fullName then
+            set fullName to shortcutName
+        end if
+        if allNames does not contain fullName then
+            return "ERROR: Shortcut not found: " & shortcutName
+        end if
+        tell application "Shortcuts Events"
+            run shortcut fullName
+        end tell
+        return "OK: Ran " & fullName
     on error errMsg
         return "ERROR: " & errMsg
     end try

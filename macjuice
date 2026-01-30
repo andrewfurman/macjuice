@@ -33,7 +33,8 @@ show_help() {
     echo "  music       Control Apple Music playback"
     echo "  contacts    Search and manage contacts"
     echo "  reminders   Manage reminders and tasks"
-    echo "  home        Control HomeKit devices"
+    echo "  shortcuts   Run any macOS Shortcut"
+    echo "  home        Control HomeKit devices (via Shortcuts)"
     echo ""
     echo -e "${YELLOW}Examples:${NC}"
     echo "  macjuice mail accounts"
@@ -45,7 +46,9 @@ show_help() {
     echo "  macjuice music now"
     echo "  macjuice contacts search \"John\""
     echo "  macjuice reminders add \"Buy milk\" \"Groceries\""
-    echo "  macjuice home run \"Good Night\""
+    echo "  macjuice shortcuts list"
+    echo "  macjuice shortcuts run \"My Shortcut\""
+    echo "  macjuice home run \"Lamp On\""
     echo ""
     echo -e "${YELLOW}Options:${NC}"
     echo "  --help, -h     Show this help message"
@@ -163,6 +166,17 @@ show_app_help() {
             echo "  delete <title>        Delete a reminder"
             echo "  search <query>        Search reminders"
             ;;
+        shortcuts)
+            echo -e "${CYAN}macjuice shortcuts${NC} - Run macOS Shortcuts"
+            echo ""
+            echo "Commands:"
+            echo "  list                  List all shortcuts"
+            echo "  run <name>            Run a shortcut by name"
+            echo "  search <query>        Search shortcuts by name"
+            echo ""
+            echo "Run any shortcut you've created in the Shortcuts app."
+            echo "First run will prompt for Automation permission."
+            ;;
         home)
             echo -e "${CYAN}macjuice home${NC} - HomeKit control (via Shortcuts)"
             echo ""
@@ -171,7 +185,11 @@ show_app_help() {
             echo "  run <shortcut>        Run a HomeKit shortcut"
             echo "  setup                 Set up HomeKit shortcuts"
             echo ""
-            echo "Note: HomeKit requires Shortcuts. Run 'macjuice home setup' first."
+            echo "HomeKit has no direct CLI access, so macjuice uses Shortcuts"
+            echo "as a bridge. Create shortcuts in the Shortcuts app that control"
+            echo "your HomeKit devices, then run them here."
+            echo ""
+            echo "See: macjuice home setup"
             ;;
         *)
             echo -e "${RED}Error:${NC} Unknown app: $app"
@@ -217,7 +235,7 @@ main() {
 
     # Route to the appropriate AppleScript
     case "$app" in
-        mail|notes|calendar|messages|music|contacts|reminders)
+        mail|notes|calendar|messages|music|contacts|reminders|shortcuts)
             run_applescript "$app" "$cmd" "$@"
             ;;
         home)
