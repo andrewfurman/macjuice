@@ -86,129 +86,128 @@ end listChats
 
 -- Send a message
 on sendMessage(recipient, messageText)
-    tell application "Messages"
-        -- Try to find existing chat first
-        set targetChat to missing value
-
-        -- Check if recipient is a phone number or email
-        if recipient starts with "+" or recipient starts with "1" or (recipient does not contain "@" and recipient does not contain " ") then
-            -- Looks like a phone number, try to send via service
+    -- Check if recipient is a phone number or email
+    if recipient starts with "+" or recipient starts with "1" or (recipient does not contain "@" and recipient does not contain " ") then
+        -- Looks like a phone number, try to send via service
+        tell application "Messages"
             set targetService to 1st account whose service type = iMessage
             set targetBuddy to participant recipient of targetService
             send messageText to targetBuddy
-            return "OK: Sent to " & recipient
-        else
-            -- Recipient looks like a name — try contact lookup first
-            try
-                tell application "Contacts"
-                    set matchedPeople to (every person whose name contains recipient)
-                    set matchCount to count of matchedPeople
-                    if matchCount > 1 then
-                        -- Multiple contacts found — show details so user can pick
-                        set detailLines to {"ERROR: Multiple contacts match \"" & recipient & "\". Please specify which one by using their phone number directly:" & linefeed}
-                        repeat with i from 1 to matchCount
-                            set p to item i of matchedPeople
-                            set personInfo to (i as text) & ") " & (name of p)
+        end tell
+        return "OK: Sent to " & recipient
+    end if
 
-                            -- Get address
+    -- Recipient looks like a name — try contact lookup first
+    try
+        tell application "Contacts"
+            set matchedPeople to (every person whose name contains recipient)
+            set matchCount to count of matchedPeople
+            if matchCount > 1 then
+                -- Multiple contacts found — show details so user can pick
+                set detailLines to {"ERROR: Multiple contacts match \"" & recipient & "\". Please specify which one by using their phone number directly:" & linefeed}
+                repeat with i from 1 to matchCount
+                    set p to item i of matchedPeople
+                    set personInfo to (i as text) & ") " & (name of p)
+
+                    -- Get address
+                    try
+                        if (count of addresses of p) > 0 then
+                            set addr to item 1 of addresses of p
+                            set addrParts to {}
                             try
-                                if (count of addresses of p) > 0 then
-                                    set addr to item 1 of addresses of p
-                                    set addrParts to {}
-                                    try
-                                        if street of addr is not missing value then set end of addrParts to street of addr
-                                    end try
-                                    try
-                                        if city of addr is not missing value then set end of addrParts to city of addr
-                                    end try
-                                    try
-                                        if state of addr is not missing value then set end of addrParts to state of addr
-                                    end try
-                                    try
-                                        if zip of addr is not missing value then set end of addrParts to zip of addr
-                                    end try
-                                    if (count of addrParts) > 0 then
-                                        set personInfo to personInfo & linefeed & "   Address: " & my joinList(addrParts, ", ")
-                                    end if
-                                end if
+                                if street of addr is not missing value then set end of addrParts to street of addr
                             end try
-
-                            -- Get email
                             try
-                                if (count of emails of p) > 0 then
-                                    set personInfo to personInfo & linefeed & "   Email: " & (value of item 1 of emails of p)
-                                end if
+                                if city of addr is not missing value then set end of addrParts to city of addr
                             end try
-
-                            -- Get phone(s)
                             try
-                                if (count of phones of p) > 0 then
-                                    set phoneList to {}
-                                    repeat with ph in phones of p
-                                        set phoneLabel to label of ph
-                                        if phoneLabel is "_$!<Mobile>!$_" then set phoneLabel to "mobile"
-                                        if phoneLabel is "_$!<Home>!$_" then set phoneLabel to "home"
-                                        if phoneLabel is "_$!<Work>!$_" then set phoneLabel to "work"
-                                        set end of phoneList to (value of ph) & " (" & phoneLabel & ")"
-                                    end repeat
-                                    set personInfo to personInfo & linefeed & "   Phone: " & my joinList(phoneList, ", ")
-                                end if
+                                if state of addr is not missing value then set end of addrParts to state of addr
                             end try
-
-                            set end of detailLines to personInfo
-                        end repeat
-                        return my joinList(detailLines, linefeed)
-                    else if matchCount is 1 then
-                        set p to item 1 of matchedPeople
-                        -- Prefer mobile phone, fall back to any phone
-                        set phoneNumber to missing value
-                        repeat with ph in phones of p
-                            set phoneNumber to value of ph
-                            if label of ph is "mobile" or label of ph is "_$!<Mobile>!$_" then
-                                exit repeat
+                            try
+                                if zip of addr is not missing value then set end of addrParts to zip of addr
+                            end try
+                            if (count of addrParts) > 0 then
+                                set personInfo to personInfo & linefeed & "   Address: " & my joinList(addrParts, ", ")
                             end if
-                        end repeat
-                        if phoneNumber is not missing value then
-                            -- Send to the looked-up phone number
-                            tell application "Messages"
-                                set targetService to 1st account whose service type = iMessage
-                                set targetBuddy to participant phoneNumber of targetService
-                                send messageText to targetBuddy
-                            end tell
-                            return "OK: Sent to " & (name of p) & " (" & phoneNumber & ")"
                         end if
-                    end if
-                end tell
-            end try
+                    end try
 
-            -- Fall through: search existing chats (original logic)
-            tell application "Messages"
-                repeat with c in chats
-                    set chatName to name of c
-                    if chatName is not missing value and chatName contains recipient then
-                        set targetChat to c
+                    -- Get email
+                    try
+                        if (count of emails of p) > 0 then
+                            set personInfo to personInfo & linefeed & "   Email: " & (value of item 1 of emails of p)
+                        end if
+                    end try
+
+                    -- Get phone(s)
+                    try
+                        if (count of phones of p) > 0 then
+                            set phoneList to {}
+                            repeat with ph in phones of p
+                                set phoneLabel to label of ph
+                                if phoneLabel is "_$!<Mobile>!$_" then set phoneLabel to "mobile"
+                                if phoneLabel is "_$!<Home>!$_" then set phoneLabel to "home"
+                                if phoneLabel is "_$!<Work>!$_" then set phoneLabel to "work"
+                                set end of phoneList to (value of ph) & " (" & phoneLabel & ")"
+                            end repeat
+                            set personInfo to personInfo & linefeed & "   Phone: " & my joinList(phoneList, ", ")
+                        end if
+                    end try
+
+                    set end of detailLines to personInfo
+                end repeat
+                return my joinList(detailLines, linefeed)
+            else if matchCount is 1 then
+                set p to item 1 of matchedPeople
+                -- Prefer mobile phone, fall back to any phone
+                set phoneNumber to missing value
+                repeat with ph in phones of p
+                    set phoneNumber to value of ph
+                    if label of ph is "mobile" or label of ph is "_$!<Mobile>!$_" then
                         exit repeat
                     end if
-
-                    -- Also check participant names
-                    repeat with p in participants of c
-                        if (name of p) contains recipient then
-                            set targetChat to c
-                            exit repeat
-                        end if
-                    end repeat
-
-                    if targetChat is not missing value then exit repeat
                 end repeat
-
-                if targetChat is not missing value then
-                    send messageText to targetChat
-                    return "OK: Sent to " & recipient
-                else
-                    return "ERROR: Could not find chat for: " & recipient & linefeed & "Tip: Use phone number with country code (e.g., +15551234567)"
+                if phoneNumber is not missing value then
+                    -- Send to the looked-up phone number
+                    tell application "Messages"
+                        set targetService to 1st account whose service type = iMessage
+                        set targetBuddy to participant phoneNumber of targetService
+                        send messageText to targetBuddy
+                    end tell
+                    return "OK: Sent to " & (name of p) & " (" & phoneNumber & ")"
                 end if
-            end tell
+            end if
+        end tell
+    end try
+
+    -- Fall through: search existing chats (original logic)
+    tell application "Messages"
+        set targetChat to missing value
+        repeat with c in chats
+            set chatName to name of c
+            if chatName is not missing value and chatName contains recipient then
+                set targetChat to c
+                exit repeat
+            end if
+
+            -- Also check participant names
+            repeat with p in participants of c
+                if (name of p) contains recipient then
+                    set targetChat to c
+                    exit repeat
+                end if
+            end repeat
+
+            if targetChat is not missing value then exit repeat
+        end repeat
+
+        if targetChat is not missing value then
+            send messageText to targetChat
+            return "OK: Sent to " & recipient
+        else
+            return "ERROR: Could not find chat for: " & recipient & linefeed & "Tip: Use phone number with country code (e.g., +15551234567)"
         end if
+    end tell
 end sendMessage
 
 -- Read messages from a specific chat
