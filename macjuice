@@ -4,8 +4,8 @@
 
 set -e
 
-# Get the directory where macjuice is installed
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get the directory where macjuice is installed (resolve symlinks)
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 
 # Colors for output
