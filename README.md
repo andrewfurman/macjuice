@@ -49,10 +49,14 @@ macjuice calendar week                      # This week's events
 macjuice calendar create "Meeting" "2024-02-01 10:00" "1 hour"
 macjuice calendar list                      # List all calendars
 
-# Messages
-macjuice messages send "+15551234567" "Hello!"
-macjuice messages list                      # Recent conversations
-macjuice messages read "John Doe"           # Messages from contact
+# Messages (reads via SQLite — instant!)
+macjuice messages chats                     # List all chats with last message
+macjuice messages recent                    # Recent messages across all chats
+macjuice messages read "+15551234567"       # Read messages from a chat
+macjuice messages read "John Doe" 50        # Last 50 messages from contact
+macjuice messages search "dinner"           # Search all message text
+macjuice messages send "+15551234567" "Hello!"  # Send via AppleScript
+macjuice messages info                      # Database stats
 
 # Music
 macjuice music play
@@ -86,6 +90,32 @@ macjuice home "Thermostat" 72
 macjuice facetime "+15551234567"            # Start video call
 macjuice facetime "user@icloud.com" --audio # Audio only
 ```
+
+## Full Disk Access (Required for Messages)
+
+The Messages module reads directly from the iMessage SQLite database (`~/Library/Messages/chat.db`) for fast, reliable access to your full message history. This requires **Full Disk Access** for your terminal app.
+
+### Setup
+
+1. Open **System Settings → Privacy & Security → Full Disk Access**
+2. Click the **+** button
+3. Navigate to `/Applications/Utilities/Terminal.app` (or your terminal of choice)
+4. Click **Open** and make sure the toggle is **on**
+5. **Restart your terminal** for changes to take effect
+
+> **Note:** macOS won't accept raw binaries like `node` or `bash` — you must add the `.app` bundle (Terminal.app, iTerm.app, etc.). If you run commands over SSH, also add `/usr/sbin/sshd`.
+
+### Why SQLite instead of AppleScript?
+
+| | AppleScript | SQLite (chat.db) |
+|---|---|---|
+| **Speed** | Slow (iterates chats via IPC) | Instant (direct DB queries) |
+| **Reliability** | Flaky on modern macOS | Rock solid |
+| **History** | Limited to open chats | Full history (all 188k+ messages) |
+| **Search** | Very slow | Sub-second |
+| **Sending** | ✅ Works | ❌ Read-only |
+
+MacJuice uses **SQLite for all read operations** (chats, read, recent, search) and **AppleScript only for sending** messages.
 
 ## How It Works
 
