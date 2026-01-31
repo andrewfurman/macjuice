@@ -108,28 +108,33 @@ end sendSmsMessage
 on sendMessage(recipient, messageText)
     -- Check if recipient is a phone number or email
     if recipient starts with "+" or recipient starts with "1" or (recipient does not contain "@" and recipient does not contain " ") then
-        -- Looks like a phone number, try iMessage first, then SMS
+        -- Looks like a phone number
+        -- Defaults to iMessage, falls back to SMS (requires iPhone Text Message Forwarding)
         tell application "Messages"
-            -- Try iMessage first
+            -- Try iMessage first (default)
+            set sentVia to ""
             try
-                set targetService to 1st account whose service type = iMessage
-                set targetBuddy to participant recipient of targetService
+                set imsgService to 1st account whose service type = iMessage
+                set targetBuddy to participant recipient of imsgService
                 send messageText to targetBuddy
-                return "OK: Sent to " & recipient & " (iMessage)"
+                set sentVia to "iMessage"
             end try
-            -- Fall back to SMS service (requires iPhone relay / Text Message Forwarding)
+            -- Also send via SMS if available (ensures delivery to non-iMessage numbers)
             try
-                set targetService to 1st account whose service type = SMS
-                set targetBuddy to participant recipient of targetService
-                send messageText to targetBuddy
-                return "OK: Sent to " & recipient & " (SMS)"
+                set smsService to 1st account whose service type = SMS
+                set smsBuddy to participant recipient of smsService
+                send messageText to smsBuddy
+                if sentVia is "" then
+                    set sentVia to "SMS"
+                else
+                    set sentVia to sentVia & "+SMS"
+                end if
             end try
-            -- If both fail, try iMessage without error handling (will show error)
-            set targetService to 1st account whose service type = iMessage
-            set targetBuddy to participant recipient of targetService
-            send messageText to targetBuddy
+            if sentVia is "" then
+                return "ERROR: No iMessage or SMS service available. Check that Messages is signed in and Text Message Forwarding is enabled on your iPhone."
+            end if
+            return "OK: Sent to " & recipient & " (" & sentVia & ")"
         end tell
-        return "OK: Sent to " & recipient
     end if
 
     -- Recipient looks like a name — try contact lookup first
