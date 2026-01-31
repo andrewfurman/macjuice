@@ -208,13 +208,27 @@ on sendMessage(recipient, messageText)
                     end if
                 end repeat
                 if phoneNumber is not missing value then
-                    -- Send to the looked-up phone number
+                    -- Send to the looked-up phone number (iMessage + SMS)
                     tell application "Messages"
-                        set targetService to 1st account whose service type = iMessage
-                        set targetBuddy to participant phoneNumber of targetService
-                        send messageText to targetBuddy
+                        set sentVia to ""
+                        try
+                            set imsgService to 1st account whose service type = iMessage
+                            set targetBuddy to participant phoneNumber of imsgService
+                            send messageText to targetBuddy
+                            set sentVia to "iMessage"
+                        end try
+                        try
+                            set smsService to 1st account whose service type = SMS
+                            set smsBuddy to participant phoneNumber of smsService
+                            send messageText to smsBuddy
+                            if sentVia is "" then
+                                set sentVia to "SMS"
+                            else
+                                set sentVia to sentVia & "+SMS"
+                            end if
+                        end try
                     end tell
-                    return "OK: Sent to " & (name of p) & " (" & phoneNumber & ")"
+                    return "OK: Sent to " & (name of p) & " (" & phoneNumber & ") via " & sentVia
                 end if
             end if
         end tell

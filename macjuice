@@ -246,7 +246,18 @@ main() {
 
     # Route to the appropriate AppleScript
     case "$app" in
-        mail|notes|calendar|messages|music|contacts|reminders|photos|shortcuts)
+        messages)
+            # Messages: use SQLite for read/recent/search, AppleScript for everything else
+            case "$cmd" in
+                read|recent|search)
+                    bash "$SCRIPTS_DIR/messages-db.sh" "$cmd" "$@"
+                    ;;
+                *)
+                    run_applescript "messages" "$cmd" "$@"
+                    ;;
+            esac
+            ;;
+        mail|notes|calendar|music|contacts|reminders|photos|shortcuts)
             run_applescript "$app" "$cmd" "$@"
             ;;
         home)
