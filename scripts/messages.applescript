@@ -10,6 +10,12 @@ on run argv
 
     if cmd is "chats" then
         return listChats()
+    else if cmd is "send-sms" then
+        if (count of argv) > 2 then
+            return sendSmsMessage(item 2 of argv, item 3 of argv)
+        else
+            return "Usage: messages.applescript send-sms <phone-number> <message>"
+        end if
     else if cmd is "send" then
         if (count of argv) > 2 then
             return sendMessage(item 2 of argv, item 3 of argv)
@@ -84,12 +90,41 @@ on listChats()
     return my joinList(output, linefeed)
 end listChats
 
+-- Send a message via SMS specifically (requires iPhone Text Message Forwarding)
+on sendSmsMessage(recipient, messageText)
+    tell application "Messages"
+        try
+            set smsService to 1st account whose service type = SMS
+            set targetBuddy to participant recipient of smsService
+            send messageText to targetBuddy
+            return "OK: Sent SMS to " & recipient
+        on error errMsg
+            return "ERROR: SMS send failed — " & errMsg & linefeed & "Make sure Text Message Forwarding is enabled on your iPhone (Settings > Messages > Text Message Forwarding)"
+        end try
+    end tell
+end sendSmsMessage
+
 -- Send a message
 on sendMessage(recipient, messageText)
     -- Check if recipient is a phone number or email
     if recipient starts with "+" or recipient starts with "1" or (recipient does not contain "@" and recipient does not contain " ") then
-        -- Looks like a phone number, try to send via service
+        -- Looks like a phone number, try iMessage first, then SMS
         tell application "Messages"
+            -- Try iMessage first
+            try
+                set targetService to 1st account whose service type = iMessage
+                set targetBuddy to participant recipient of targetService
+                send messageText to targetBuddy
+                return "OK: Sent to " & recipient & " (iMessage)"
+            end try
+            -- Fall back to SMS service (requires iPhone relay / Text Message Forwarding)
+            try
+                set targetService to 1st account whose service type = SMS
+                set targetBuddy to participant recipient of targetService
+                send messageText to targetBuddy
+                return "OK: Sent to " & recipient & " (SMS)"
+            end try
+            -- If both fail, try iMessage without error handling (will show error)
             set targetService to 1st account whose service type = iMessage
             set targetBuddy to participant recipient of targetService
             send messageText to targetBuddy

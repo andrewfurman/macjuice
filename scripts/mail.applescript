@@ -30,15 +30,44 @@ on run argv
         end if
     else if cmd is "draft" then
         if (count of argv) > 3 then
-            return draftMessage(item 2 of argv, item 3 of argv, item 4 of argv)
+            -- Check if 5th arg is --from (sender account)
+            set senderAddr to ""
+            set attachStart to 5
+            if (count of argv) > 4 then
+                if item 5 of argv starts with "--from=" then
+                    set senderAddr to text 8 thru -1 of item 5 of argv
+                    set attachStart to 6
+                end if
+            end if
+            set attachments to {}
+            if (count of argv) ≥ attachStart then
+                repeat with i from attachStart to (count of argv)
+                    set end of attachments to item i of argv
+                end repeat
+            end if
+            return draftMessage(item 2 of argv, item 3 of argv, item 4 of argv, senderAddr, attachments)
         else
-            return "Usage: mail.applescript draft <to> <subject> <body>"
+            return "Usage: mail.applescript draft <to> <subject> <body> [--from=email] [attachment1] [attachment2] ..."
         end if
     else if cmd is "send" then
         if (count of argv) > 3 then
-            return sendMessage(item 2 of argv, item 3 of argv, item 4 of argv)
+            set senderAddr to ""
+            set attachStart to 5
+            if (count of argv) > 4 then
+                if item 5 of argv starts with "--from=" then
+                    set senderAddr to text 8 thru -1 of item 5 of argv
+                    set attachStart to 6
+                end if
+            end if
+            set attachments to {}
+            if (count of argv) ≥ attachStart then
+                repeat with i from attachStart to (count of argv)
+                    set end of attachments to item i of argv
+                end repeat
+            end if
+            return sendMessage(item 2 of argv, item 3 of argv, item 4 of argv, senderAddr, attachments)
         else
-            return "Usage: mail.applescript send <to> <subject> <body>"
+            return "Usage: mail.applescript send <to> <subject> <body> [--from=email] [attachment1] ..."
         end if
     else
         return "Unknown command: " & cmd
@@ -126,26 +155,55 @@ on readMessage(messageId)
 end readMessage
 
 -- Create a draft message (saved and opened, not sent)
-on draftMessage(toAddr, subjectText, bodyText)
+on draftMessage(toAddr, subjectText, bodyText, senderAddr, attachmentPaths)
     tell application "Mail"
         set newMessage to make new outgoing message with properties {subject:subjectText, content:bodyText, visible:true}
         tell newMessage
             make new to recipient at end of to recipients with properties {address:toAddr}
+            -- Set sender if specified
+            if senderAddr is not "" then
+                set sender to senderAddr
+            end if
+            repeat with attachPath in attachmentPaths
+                set attachFile to POSIX file (attachPath as text) as alias
+                make new attachment with properties {file name:attachFile} at after the last paragraph
+            end repeat
         end tell
         -- Do not send — leave as draft
-        return "OK: Draft saved and opened in Mail for " & toAddr
+        set attachCount to count of attachmentPaths
+        set fromNote to ""
+        if senderAddr is not "" then
+            set fromNote to " from " & senderAddr
+        end if
+        if attachCount > 0 then
+            return "OK: Draft saved and opened in Mail for " & toAddr & fromNote & " with " & attachCount & " attachments"
+        else
+            return "OK: Draft saved and opened in Mail for " & toAddr & fromNote
+        end if
     end tell
 end draftMessage
 
 -- Send a new message
-on sendMessage(toAddr, subjectText, bodyText)
+on sendMessage(toAddr, subjectText, bodyText, senderAddr, attachmentPaths)
     tell application "Mail"
         set newMessage to make new outgoing message with properties {subject:subjectText, content:bodyText, visible:true}
         tell newMessage
             make new to recipient at end of to recipients with properties {address:toAddr}
+            if senderAddr is not "" then
+                set sender to senderAddr
+            end if
+            repeat with attachPath in attachmentPaths
+                set attachFile to POSIX file (attachPath as text) as alias
+                make new attachment with properties {file name:attachFile} at after the last paragraph
+            end repeat
         end tell
         send newMessage
-        return "OK: Message sent to " & toAddr
+        set attachCount to count of attachmentPaths
+        if attachCount > 0 then
+            return "OK: Message sent to " & toAddr & " with " & attachCount & " attachments"
+        else
+            return "OK: Message sent to " & toAddr
+        end if
     end tell
 end sendMessage
 
