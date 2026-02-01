@@ -30,24 +30,28 @@ on run argv
         end if
     else if cmd is "draft" then
         if (count of argv) > 3 then
-            -- Check if 5th arg is --from (sender account)
+            -- Parse optional flags: --from=, --cc=, --bcc=, and attachment paths
             set senderAddr to ""
-            set attachStart to 5
-            if (count of argv) > 4 then
-                if item 5 of argv starts with "--from=" then
-                    set senderAddr to text 8 thru -1 of item 5 of argv
-                    set attachStart to 6
-                end if
-            end if
+            set ccAddr to ""
+            set bccAddr to ""
             set attachments to {}
-            if (count of argv) ≥ attachStart then
-                repeat with i from attachStart to (count of argv)
-                    set end of attachments to item i of argv
+            if (count of argv) > 4 then
+                repeat with i from 5 to (count of argv)
+                    set arg to item i of argv
+                    if arg starts with "--from=" then
+                        set senderAddr to text 8 thru -1 of arg
+                    else if arg starts with "--cc=" then
+                        set ccAddr to text 6 thru -1 of arg
+                    else if arg starts with "--bcc=" then
+                        set bccAddr to text 7 thru -1 of arg
+                    else
+                        set end of attachments to arg
+                    end if
                 end repeat
             end if
-            return draftMessage(item 2 of argv, item 3 of argv, item 4 of argv, senderAddr, attachments)
+            return draftMessage(item 2 of argv, item 3 of argv, item 4 of argv, senderAddr, ccAddr, bccAddr, attachments)
         else
-            return "Usage: mail.applescript draft <to> <subject> <body> [--from=email] [attachment1] [attachment2] ..."
+            return "Usage: mail.applescript draft <to> <subject> <body> [--from=email] [--cc=email] [--bcc=email] [attachment ...]"
         end if
     else if cmd is "send" then
         if (count of argv) > 3 then
@@ -154,8 +158,8 @@ on readMessage(messageId)
     end tell
 end readMessage
 
--- Create a draft message (saved and opened, not sent)
-on draftMessage(toAddr, subjectText, bodyText, senderAddr, attachmentPaths)
+-- Create a draft message and save it to the Drafts folder
+on draftMessage(toAddr, subjectText, bodyText, senderAddr, ccAddr, bccAddr, attachmentPaths)
     tell application "Mail"
         set newMessage to make new outgoing message with properties {subject:subjectText, content:bodyText, visible:true}
         tell newMessage
@@ -164,22 +168,39 @@ on draftMessage(toAddr, subjectText, bodyText, senderAddr, attachmentPaths)
             if senderAddr is not "" then
                 set sender to senderAddr
             end if
+            -- Set CC if specified
+            if ccAddr is not "" then
+                make new cc recipient at end of cc recipients with properties {address:ccAddr}
+            end if
+            -- Set BCC if specified
+            if bccAddr is not "" then
+                make new bcc recipient at end of bcc recipients with properties {address:bccAddr}
+            end if
             repeat with attachPath in attachmentPaths
                 set attachFile to POSIX file (attachPath as text) as alias
                 make new attachment with properties {file name:attachFile} at after the last paragraph
             end repeat
         end tell
-        -- Do not send — leave as draft
-        set attachCount to count of attachmentPaths
+        -- Save as draft: close the compose window which triggers save-to-Drafts
+        delay 0.5
+        close window 1 saving yes
+        -- Build status message
         set fromNote to ""
         if senderAddr is not "" then
             set fromNote to " from " & senderAddr
         end if
-        if attachCount > 0 then
-            return "OK: Draft saved and opened in Mail for " & toAddr & fromNote & " with " & attachCount & " attachments"
-        else
-            return "OK: Draft saved and opened in Mail for " & toAddr & fromNote
+        set extras to ""
+        if ccAddr is not "" then
+            set extras to extras & " cc:" & ccAddr
         end if
+        if bccAddr is not "" then
+            set extras to extras & " bcc:" & bccAddr
+        end if
+        set attachCount to count of attachmentPaths
+        if attachCount > 0 then
+            set extras to extras & " (" & attachCount & " attachments)"
+        end if
+        return "OK: Draft saved to Drafts for " & toAddr & fromNote & extras
     end tell
 end draftMessage
 

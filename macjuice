@@ -91,6 +91,12 @@ show_app_help() {
             echo "  search <query>        Search emails"
             echo "  read <message-id>     Read a specific email"
             echo "  send <to> <subj> <body>  Send an email"
+            echo "  draft <to> <subj> <body> Save a draft email"
+            echo ""
+            echo "Draft options:"
+            echo "  --account <name>      Send from a specific account"
+            echo "  --cc <email>          Add CC recipient"
+            echo "  --bcc <email>         Add BCC recipient"
             ;;
         notes)
             echo -e "${CYAN}macjuice notes${NC} - Notes management"
@@ -261,7 +267,66 @@ main() {
                     ;;
             esac
             ;;
-        mail|notes|calendar|music|contacts|reminders|photos|shortcuts)
+        mail)
+            case "$cmd" in
+                draft)
+                    # Parse: macjuice mail draft <to> <subject> <body> [--account <name>] [--cc <cc>] [--bcc <bcc>] [--reply-to <id>]
+                    if [[ $# -lt 3 ]]; then
+                        echo -e "${RED}Error:${NC} draft requires <to> <subject> <body>"
+                        echo "Usage: macjuice mail draft <to> <subject> <body> [--account <name>] [--cc <cc>] [--bcc <bcc>] [--reply-to <message-id>]"
+                        exit 1
+                    fi
+                    local to_addr="$1" subject="$2" body="$3"
+                    shift 3
+                    local account="" cc="" bcc="" reply_to=""
+                    while [[ $# -gt 0 ]]; do
+                        case "$1" in
+                            --account) account="$2"; shift 2 ;;
+                            --cc)      cc="$2"; shift 2 ;;
+                            --bcc)     bcc="$2"; shift 2 ;;
+                            --reply-to) reply_to="$2"; shift 2 ;;
+                            *)         shift ;;
+                        esac
+                    done
+
+                    # Try himalaya (IMAP) first — clean, no UI, reliable
+                    if command -v himalaya &>/dev/null; then
+                        # Build RFC822 message
+                        local msg=""
+                        local from_addr="${account:-aifurman@gmail.com}"
+                        msg="From: ${from_addr}"$'\n'
+                        msg+="To: ${to_addr}"$'\n'
+                        msg+="Subject: ${subject}"$'\n'
+                        [[ -n "$cc" ]] && msg+="Cc: ${cc}"$'\n'
+                        [[ -n "$bcc" ]] && msg+="Bcc: ${bcc}"$'\n'
+                        [[ -n "$reply_to" ]] && msg+="In-Reply-To: ${reply_to}"$'\n'
+                        msg+="Content-Type: text/plain; charset=utf-8"$'\n'
+                        msg+="MIME-Version: 1.0"$'\n'
+                        msg+=$'\n'
+                        msg+="${body}"
+
+                        if echo "$msg" | himalaya message save -f "[Gmail]/Drafts" 2>&1 | grep -q "successfully saved"; then
+                            local extras=""
+                            [[ -n "$cc" ]] && extras+=" cc:${cc}"
+                            [[ -n "$bcc" ]] && extras+=" bcc:${bcc}"
+                            echo -e "${GREEN}OK:${NC} Draft saved to Drafts for ${to_addr}${extras}"
+                            exit 0
+                        fi
+                    fi
+
+                    # Fallback: AppleScript (opens Mail, creates compose window, saves)
+                    local args=("$to_addr" "$subject" "$body")
+                    [[ -n "$account" ]] && args+=("--from=$account")
+                    [[ -n "$cc" ]] && args+=("--cc=$cc")
+                    [[ -n "$bcc" ]] && args+=("--bcc=$bcc")
+                    run_applescript "mail" "draft" "${args[@]}"
+                    ;;
+                *)
+                    run_applescript "mail" "$cmd" "$@"
+                    ;;
+            esac
+            ;;
+        notes|calendar|music|contacts|reminders|photos|shortcuts)
             run_applescript "$app" "$cmd" "$@"
             ;;
         home)
