@@ -326,7 +326,23 @@ main() {
                     ;;
             esac
             ;;
-        notes|calendar|music|contacts|reminders|photos|shortcuts)
+        photos)
+            case "$cmd" in
+                search)
+                    # SQLite-based search (fast, handles 166K+ photos)
+                    if [[ $# -lt 1 ]]; then
+                        echo -e "${RED}Error:${NC} search requires a query"
+                        echo "Usage: macjuice photos search <query>"
+                        exit 1
+                    fi
+                    python3 "$SCRIPTS_DIR/photos_search.py" "$@"
+                    ;;
+                *)
+                    run_applescript "photos" "$cmd" "$@"
+                    ;;
+            esac
+            ;;
+        notes|calendar|music|contacts|reminders|shortcuts)
             run_applescript "$app" "$cmd" "$@"
             ;;
         home)
