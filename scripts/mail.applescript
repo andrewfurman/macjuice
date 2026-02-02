@@ -53,6 +53,28 @@ on run argv
         else
             return "Usage: mail.applescript draft <to> <subject> <body> [--from=email] [--cc=email] [--bcc=email] [attachment ...]"
         end if
+    else if cmd is "reply" then
+        -- reply <message-id> <body> [--from=email] [--cc=emails] [--bcc=emails]
+        if (count of argv) > 2 then
+            set senderAddr to ""
+            set ccAddr to ""
+            set bccAddr to ""
+            if (count of argv) > 3 then
+                repeat with i from 4 to (count of argv)
+                    set arg to item i of argv
+                    if arg starts with "--from=" then
+                        set senderAddr to text 8 thru -1 of arg
+                    else if arg starts with "--cc=" then
+                        set ccAddr to text 6 thru -1 of arg
+                    else if arg starts with "--bcc=" then
+                        set bccAddr to text 7 thru -1 of arg
+                    end if
+                end repeat
+            end if
+            return replyMessage(item 2 of argv, item 3 of argv, senderAddr, ccAddr, bccAddr)
+        else
+            return "Usage: mail.applescript reply <message-id> <body> [--from=email] [--cc=emails] [--bcc=emails]"
+        end if
     else if cmd is "send" then
         if (count of argv) > 3 then
             set senderAddr to ""
@@ -168,13 +190,19 @@ on draftMessage(toAddr, subjectText, bodyText, senderAddr, ccAddr, bccAddr, atta
             if senderAddr is not "" then
                 set sender to senderAddr
             end if
-            -- Set CC if specified
+            -- Set CC if specified (supports comma-separated list)
             if ccAddr is not "" then
-                make new cc recipient at end of cc recipients with properties {address:ccAddr}
+                set ccList to my splitCommaList(ccAddr)
+                repeat with addr in ccList
+                    make new cc recipient at end of cc recipients with properties {address:addr}
+                end repeat
             end if
-            -- Set BCC if specified
+            -- Set BCC if specified (supports comma-separated list)
             if bccAddr is not "" then
-                make new bcc recipient at end of bcc recipients with properties {address:bccAddr}
+                set bccList to my splitCommaList(bccAddr)
+                repeat with addr in bccList
+                    make new bcc recipient at end of bcc recipients with properties {address:addr}
+                end repeat
             end if
             repeat with attachPath in attachmentPaths
                 set attachFile to POSIX file (attachPath as text) as alias
@@ -227,6 +255,94 @@ on sendMessage(toAddr, subjectText, bodyText, senderAddr, attachmentPaths)
         end if
     end tell
 end sendMessage
+
+-- Reply-all to an existing message (saves as draft, preserves quoted thread)
+on replyMessage(messageId, bodyText, senderAddr, ccAddr, bccAddr)
+    tell application "Mail"
+        -- Find the original message by ID (same pattern as readMessage)
+        repeat with acc in accounts
+            repeat with mb in mailboxes of acc
+                try
+                    set origMsg to (first message of mb whose id is messageId)
+                    -- Use reply-all so all To/CC recipients are included
+                    set replyMsg to reply origMsg with opening window and reply to all
+                    if senderAddr is not "" then
+                        set sender of replyMsg to senderAddr
+                    end if
+                    -- Add additional CC recipients (supports comma-separated list)
+                    if ccAddr is not "" then
+                        set ccList to my splitCommaList(ccAddr)
+                        tell replyMsg
+                            repeat with addr in ccList
+                                make new cc recipient at end of cc recipients with properties {address:addr}
+                            end repeat
+                        end tell
+                    end if
+                    -- Add BCC recipients (supports comma-separated list)
+                    if bccAddr is not "" then
+                        set bccList to my splitCommaList(bccAddr)
+                        tell replyMsg
+                            repeat with addr in bccList
+                                make new bcc recipient at end of bcc recipients with properties {address:addr}
+                            end repeat
+                        end tell
+                    end if
+                    -- Wait for compose window to fully load with quoted content
+                    delay 1.5
+                    -- Use clipboard paste to insert body text at cursor position
+                    -- The cursor starts at the top of the reply body, so pasting here
+                    -- preserves the quoted thread below
+                    set oldClipboard to the clipboard
+                    set the clipboard to bodyText & linefeed & linefeed
+                    tell application "System Events"
+                        tell process "Mail"
+                            set frontmost to true
+                            keystroke "v" using command down
+                        end tell
+                    end tell
+                    delay 0.5
+                    set the clipboard to oldClipboard
+                    -- Save as draft
+                    delay 0.5
+                    close window 1 saving yes
+                    -- Build status message
+                    set extras to ""
+                    if ccAddr is not "" then
+                        set extras to extras & " cc:" & ccAddr
+                    end if
+                    if bccAddr is not "" then
+                        set extras to extras & " bcc:" & bccAddr
+                    end if
+                    return "OK: Reply-all draft saved (to " & sender of origMsg & ", re: " & subject of origMsg & ")" & extras
+                end try
+            end repeat
+        end repeat
+        return "Message not found: " & messageId
+    end tell
+end replyMessage
+
+-- Helper: Split comma-separated string into a list, trimming whitespace
+on splitCommaList(theString)
+    set oldDelimiters to AppleScript's text item delimiters
+    set AppleScript's text item delimiters to ","
+    set theItems to text items of theString
+    set AppleScript's text item delimiters to oldDelimiters
+    set trimmedList to {}
+    repeat with anItem in theItems
+        -- Trim leading/trailing spaces
+        set trimmed to anItem as text
+        repeat while trimmed starts with " "
+            set trimmed to text 2 thru -1 of trimmed
+        end repeat
+        repeat while trimmed ends with " "
+            set trimmed to text 1 thru -2 of trimmed
+        end repeat
+        if trimmed is not "" then
+            set end of trimmedList to trimmed
+        end if
+    end repeat
+    return trimmedList
+end splitCommaList
 
 -- Helper: Join list with delimiter
 on joinList(theList, delimiter)

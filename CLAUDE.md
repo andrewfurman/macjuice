@@ -28,8 +28,16 @@ macjuice mail send "user@example.com" "Subject" "Body" --from=me@icloud.com  # S
 macjuice mail draft "user@example.com" "Subject" "Body"  # Save email as draft
 macjuice mail draft "user@example.com" "Subject" "Body" --from=me@icloud.com  # Draft from specific account
 macjuice mail draft "user@example.com" "Subject" "Body" --cc=a@x.com --bcc=b@x.com  # Draft with CC/BCC
+macjuice mail draft "user@example.com" "Subject" "Body" --cc=a@x.com,b@x.com  # Draft with multiple CC
 macjuice mail draft "user@example.com" "Subject" "Body" /path/to/file.pdf  # Draft with attachment
+macjuice mail reply <message-id> "Reply body"          # Reply-all (saves as draft)
+macjuice mail reply <message-id> "Reply body" --from=me@icloud.com  # Reply from specific account
+macjuice mail reply <message-id> "Reply body" --cc=extra@x.com,other@x.com  # Reply with extra CC
+macjuice mail reply <message-id> "Reply body" --bcc=hidden@x.com  # Reply with BCC
+macjuice mail reply --search "subject query" "Reply body"  # Search and reply
 ```
+
+The `--cc` and `--bcc` flags accept comma-separated email addresses for multiple recipients.
 
 The `--from=` flag controls which mail account is used, which determines which Drafts folder the draft is saved to (e.g., iCloud's "Cloud Drafts"). Use `macjuice mail accounts` to see available account addresses.
 

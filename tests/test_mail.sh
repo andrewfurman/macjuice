@@ -33,16 +33,78 @@ assert_exit_zero \
     "mail draft exits 0" \
     "$MACJUICE" mail draft "test@example.com" "macjuice test draft" "This is an automated test draft from macjuice."
 
-# 6. mail draft output confirms success
+# 6. mail draft output confirms success (himalaya saves to Drafts, AppleScript opens in Mail)
 assert_output_matches \
-    "mail draft output confirms draft saved and opened" \
-    "OK: Draft saved and opened in Mail for test@example.com" \
+    "mail draft output confirms draft saved" \
+    "OK:.*Draft saved" \
     "$MACJUICE" mail draft "test@example.com" "macjuice test draft" "This is an automated test draft from macjuice."
 
-# 7. mail draft with missing args shows usage
+# 7. mail help includes draft command
 assert_output_matches \
-    "mail draft missing args shows usage" \
-    "Usage:" \
-    "$MACJUICE" mail draft
+    "mail help includes draft command" \
+    "draft.*Save a draft" \
+    "$MACJUICE" mail --help
+
+# 8. mail draft with --cc exits 0
+assert_exit_zero \
+    "mail draft with --cc exits 0" \
+    "$MACJUICE" mail draft "test@example.com" "macjuice cc test" "Testing CC" --cc "cc1@example.com"
+
+# 9. mail draft with --cc output shows cc recipient
+assert_output_matches \
+    "mail draft with --cc shows cc in output" \
+    "cc:cc1@example.com" \
+    "$MACJUICE" mail draft "test@example.com" "macjuice cc test" "Testing CC" --cc "cc1@example.com"
+
+# 10. mail draft with multiple comma-separated --cc exits 0
+assert_exit_zero \
+    "mail draft with multiple --cc exits 0" \
+    "$MACJUICE" mail draft "test@example.com" "macjuice multi-cc test" "Testing multi CC" --cc "cc1@example.com,cc2@example.com"
+
+# 11. mail draft with multiple --cc shows cc in output
+assert_output_matches \
+    "mail draft with multiple --cc shows all in output" \
+    "cc:cc1@example.com,cc2@example.com" \
+    "$MACJUICE" mail draft "test@example.com" "macjuice multi-cc test" "Testing multi CC" --cc "cc1@example.com,cc2@example.com"
+
+# 12. mail draft with --bcc exits 0
+assert_exit_zero \
+    "mail draft with --bcc exits 0" \
+    "$MACJUICE" mail draft "test@example.com" "macjuice bcc test" "Testing BCC" --bcc "bcc1@example.com"
+
+# 13. mail draft with --bcc output shows bcc recipient
+assert_output_matches \
+    "mail draft with --bcc shows bcc in output" \
+    "bcc:bcc1@example.com" \
+    "$MACJUICE" mail draft "test@example.com" "macjuice bcc test" "Testing BCC" --bcc "bcc1@example.com"
+
+# 14. mail draft with both --cc and --bcc exits 0
+assert_exit_zero \
+    "mail draft with --cc and --bcc exits 0" \
+    "$MACJUICE" mail draft "test@example.com" "macjuice cc+bcc test" "Testing CC and BCC" --cc "cc1@example.com,cc2@example.com" --bcc "bcc1@example.com"
+
+# 15. mail draft with both --cc and --bcc shows both in output
+assert_output_matches \
+    "mail draft with --cc and --bcc shows both in output" \
+    "cc:.*bcc:" \
+    "$MACJUICE" mail draft "test@example.com" "macjuice cc+bcc test" "Testing CC and BCC" --cc "cc1@example.com,cc2@example.com" --bcc "bcc1@example.com"
+
+# 16. mail help includes reply command
+assert_output_matches \
+    "mail help includes reply command" \
+    "reply.*Reply to a message" \
+    "$MACJUICE" mail --help
+
+# 17. mail help includes reply CC/BCC options
+assert_output_matches \
+    "mail help shows reply --cc option" \
+    "cc.*recipients" \
+    "$MACJUICE" mail --help
+
+# 18. mail help includes reply --bcc option
+assert_output_matches \
+    "mail help shows reply --bcc option" \
+    "bcc.*recipients" \
+    "$MACJUICE" mail --help
 
 print_summary "Mail"

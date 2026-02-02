@@ -98,11 +98,18 @@ show_app_help() {
             echo "  read <message-id>     Read a specific email"
             echo "  send <to> <subj> <body>  Send an email"
             echo "  draft <to> <subj> <body> Save a draft email"
+            echo "  reply <id> <body>     Reply to a message (saves as draft)"
             echo ""
             echo "Draft options:"
             echo "  --account <name>      Send from a specific account"
-            echo "  --cc <email>          Add CC recipient"
-            echo "  --bcc <email>         Add BCC recipient"
+            echo "  --cc <emails>         Add CC recipients (comma-separated)"
+            echo "  --bcc <emails>        Add BCC recipients (comma-separated)"
+            echo ""
+            echo "Reply options:"
+            echo "  --search <query>      Find message by subject/sender instead of ID"
+            echo "  --from <email>        Send from a specific account"
+            echo "  --cc <emails>         Add CC recipients (comma-separated)"
+            echo "  --bcc <emails>        Add BCC recipients (comma-separated)"
             ;;
         notes)
             echo -e "${CYAN}macjuice notes${NC} - Notes management"
@@ -326,6 +333,67 @@ main() {
                     [[ -n "$cc" ]] && args+=("--cc=$cc")
                     [[ -n "$bcc" ]] && args+=("--bcc=$bcc")
                     run_applescript "mail" "draft" "${args[@]}"
+                    ;;
+                reply)
+                    # Parse: macjuice mail reply <message-id-or-search> <body> [--from=email] [--cc=emails] [--bcc=emails]
+                    if [[ $# -lt 2 ]]; then
+                        echo -e "${RED}Error:${NC} reply requires <message-id> <body>"
+                        echo "Usage: macjuice mail reply <message-id> <body> [--from=email] [--cc=a@x.com,b@x.com] [--bcc=c@x.com]"
+                        echo "       macjuice mail reply --search <query> <body> [--from=email] [--cc=emails] [--bcc=emails]"
+                        exit 1
+                    fi
+
+                    local from_flag="" cc="" bcc=""
+                    local search_mode=false
+                    local msg_id=""
+                    local body=""
+
+                    # Check for --search mode
+                    if [[ "$1" == "--search" ]]; then
+                        search_mode=true
+                        shift
+                        if [[ $# -lt 2 ]]; then
+                            echo -e "${RED}Error:${NC} --search requires <query> <body>"
+                            exit 1
+                        fi
+                        local query="$1"
+                        body="$2"
+                        shift 2
+
+                        # Search for the message, take the first result
+                        local search_result
+                        search_result=$(run_applescript "mail" "search" "$query")
+                        if [[ "$search_result" == "No messages found"* ]]; then
+                            echo -e "${RED}Error:${NC} $search_result"
+                            exit 1
+                        fi
+                        # First line, first field (ID) before the " | "
+                        msg_id=$(echo "$search_result" | head -1 | cut -d'|' -f1 | xargs)
+                        echo -e "${BLUE}Found:${NC} $(echo "$search_result" | head -1)"
+                    else
+                        msg_id="$1"
+                        body="$2"
+                        shift 2
+                    fi
+
+                    # Parse optional flags
+                    while [[ $# -gt 0 ]]; do
+                        case "$1" in
+                            --from=*) from_flag="${1#--from=}"; shift ;;
+                            --from)   from_flag="$2"; shift 2 ;;
+                            --cc=*)   cc="${1#--cc=}"; shift ;;
+                            --cc)     cc="$2"; shift 2 ;;
+                            --bcc=*)  bcc="${1#--bcc=}"; shift ;;
+                            --bcc)    bcc="$2"; shift 2 ;;
+                            *)        shift ;;
+                        esac
+                    done
+
+                    local args=("$msg_id" "$body")
+                    [[ -n "$from_flag" ]] && args+=("--from=$from_flag")
+                    [[ -n "$cc" ]] && args+=("--cc=$cc")
+                    [[ -n "$bcc" ]] && args+=("--bcc=$bcc")
+                    run_applescript "mail" "reply" "${args[@]}"
                     ;;
                 *)
                     run_applescript "mail" "$cmd" "$@"
