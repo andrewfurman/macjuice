@@ -4,8 +4,14 @@
 
 set -e
 
-# Get the directory where macjuice is installed (resolve symlinks)
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")" && pwd)"
+# Get the directory where macjuice is installed (follow symlinks)
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE" ]]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ "$SOURCE" != /* ]] && SOURCE="$SCRIPT_DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 
 # Colors for output
@@ -135,7 +141,7 @@ show_app_help() {
             echo -e "${CYAN}macjuice music${NC} - Apple Music control"
             echo ""
             echo "Commands:"
-            echo "  play                  Start playback"
+            echo "  play [playlist]       Start playback (optionally from a playlist)"
             echo "  pause                 Pause playback"
             echo "  toggle                Toggle play/pause"
             echo "  next                  Next track"

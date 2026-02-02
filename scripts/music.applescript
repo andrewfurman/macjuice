@@ -9,7 +9,11 @@ on run argv
     set cmd to item 1 of argv
 
     if cmd is "play" then
-        return musicPlay()
+        if (count of argv) > 1 then
+            return musicPlayPlaylist(item 2 of argv)
+        else
+            return musicPlay()
+        end if
     else if cmd is "pause" then
         return musicPause()
     else if cmd is "toggle" then
@@ -46,6 +50,19 @@ on musicPlay()
         return "OK: Playing"
     end tell
 end musicPlay
+
+-- Play a specific playlist by name
+on musicPlayPlaylist(playlistName)
+    tell application "Music"
+        try
+            set targetPlaylist to playlist playlistName
+            play targetPlaylist
+            return "OK: Playing playlist \"" & playlistName & "\""
+        on error
+            return "Error: Playlist \"" & playlistName & "\" not found"
+        end try
+    end tell
+end musicPlayPlaylist
 
 -- Pause
 on musicPause()

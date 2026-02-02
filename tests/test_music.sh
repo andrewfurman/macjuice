@@ -75,4 +75,16 @@ assert_output_not_empty \
     "music now after pause shows info" \
     "$MACJUICE" music now
 
+# 6. Play with playlist name returns expected output
+assert_output_matches \
+    "music play with playlist name responds" \
+    "[Pp]lay|[Ee]rror.*[Pp]laylist" \
+    "$MACJUICE" music play "Library"
+
+# 7. Help text shows playlist argument
+assert_output_matches \
+    "music help shows play [playlist] syntax" \
+    "play \\[playlist\\]" \
+    "$MACJUICE" music --help
+
 print_summary "Music"
