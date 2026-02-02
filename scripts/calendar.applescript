@@ -48,16 +48,20 @@ end run
 
 -- List all calendars
 on listCalendars()
-    tell application "Calendar"
-        with timeout of 5 seconds
-        set output to {}
-        repeat with cal in calendars
-            set calInfo to (name of cal) & " [" & (name of cal) & "]"
-            set end of output to calInfo
-        end repeat
-        end timeout
-    end tell
-    return my joinList(output, linefeed)
+    try
+        tell application "Calendar"
+            with timeout of 30 seconds
+                set output to {}
+                repeat with cal in calendars
+                    set calInfo to (name of cal) & " [" & (name of cal) & "]"
+                    set end of output to calInfo
+                end repeat
+            end timeout
+        end tell
+        return my joinList(output, linefeed)
+    on error errMsg
+        return "Error listing calendars: " & errMsg
+    end try
 end listCalendars
 
 -- Get today's events
@@ -89,152 +93,204 @@ end upcomingEvents
 
 -- Get events in a date range
 on getEventsInRange(startDate, endDate)
-    tell application "Calendar"
-        with timeout of 5 seconds
-        set output to {}
+    set output to {}
+    set skippedCals to {}
 
-        repeat with cal in calendars
-            try
-                set calEvents to (every event of cal whose start date ≥ startDate and start date ≤ endDate)
-                repeat with evt in calEvents
-                    set evtStart to start date of evt
-                    set evtEnd to end date of evt
-                    set evtTitle to summary of evt
+    try
+        tell application "Calendar"
+            with timeout of 120 seconds
+                set allCals to calendars
+            end timeout
+        end tell
+    on error errMsg
+        return "Error accessing Calendar app: " & errMsg
+    end try
 
-                    -- Format time
-                    set timeStr to my formatDateTime(evtStart)
+    repeat with cal in allCals
+        set calName to ""
+        try
+            tell application "Calendar"
+                with timeout of 15 seconds
+                    set calName to name of cal
+                    set calEvents to (every event of cal whose start date ≥ startDate and start date ≤ endDate)
+                    set maxEventsPerCal to 50
+                    set evtCount to 0
+                    repeat with evt in calEvents
+                        set evtCount to evtCount + 1
+                        if evtCount > maxEventsPerCal then exit repeat
 
-                    -- Calculate duration
-                    set durationMins to ((evtEnd - evtStart) / 60) as integer
-                    if durationMins ≥ 60 then
-                        set durationStr to (durationMins div 60) & "h"
-                        if durationMins mod 60 > 0 then
-                            set durationStr to durationStr & (durationMins mod 60) & "m"
+                        set evtStart to start date of evt
+                        set evtEnd to end date of evt
+                        set evtTitle to summary of evt
+
+                        -- Format time
+                        set timeStr to my formatDateTime(evtStart)
+
+                        -- Calculate duration
+                        set durationMins to ((evtEnd - evtStart) / 60) as integer
+                        if durationMins ≥ 60 then
+                            set durationStr to (durationMins div 60) & "h"
+                            if durationMins mod 60 > 0 then
+                                set durationStr to durationStr & (durationMins mod 60) & "m"
+                            end if
+                        else
+                            set durationStr to durationMins & "m"
                         end if
-                    else
-                        set durationStr to durationMins & "m"
-                    end if
 
-                    -- Get location if available
-                    set locStr to ""
-                    try
-                        if location of evt is not missing value and location of evt is not "" then
-                            set locStr to " @ " & (location of evt)
-                        end if
-                    end try
+                        -- Get location if available
+                        set locStr to ""
+                        try
+                            if location of evt is not missing value and location of evt is not "" then
+                                set locStr to " @ " & (location of evt)
+                            end if
+                        end try
 
-                    set evtLine to timeStr & " | " & evtTitle & " (" & durationStr & ")" & locStr & " [" & (name of cal) & "]"
-                    set end of output to {startDate:evtStart, eventLine:evtLine}
-                end repeat
-            end try
+                        set evtLine to timeStr & " | " & evtTitle & " (" & durationStr & ")" & locStr & " [" & calName & "]"
+                        set end of output to {startDate:evtStart, eventLine:evtLine}
+                    end repeat
+                end timeout
+            end tell
+        on error errMsg
+            if calName is "" then set calName to "(unknown)"
+            set end of skippedCals to calName
+        end try
+    end repeat
+
+    -- Sort by date (simple bubble sort)
+    set sortedOutput to my sortEventsByDate(output)
+
+    -- Extract just the display strings
+    set outputLines to {}
+    repeat with item_ref in sortedOutput
+        set end of outputLines to eventLine of item_ref
+    end repeat
+
+    -- Append skipped calendar warnings
+    if (count of skippedCals) > 0 then
+        set end of outputLines to ""
+        repeat with skipped in skippedCals
+            set end of outputLines to "(skipped calendar: " & skipped & " - timed out)"
         end repeat
+    end if
 
-        -- Sort by date (simple bubble sort)
-        set sortedOutput to my sortEventsByDate(output)
+    if (count of outputLines) is 0 then
+        return "No events found"
+    end if
 
-        -- Extract just the display strings
-        set outputLines to {}
-        repeat with item_ref in sortedOutput
-            set end of outputLines to eventLine of item_ref
-        end repeat
-
-        if (count of outputLines) is 0 then
-            return "No events found"
-        end if
-        end timeout
-    end tell
     return my joinList(outputLines, linefeed)
 end getEventsInRange
 
 -- Search events by title
 on searchEvents(query)
-    tell application "Calendar"
-        with timeout of 5 seconds
-        set output to {}
-        set maxResults to 20
-        set searchStart to current date
-        set searchEnd to searchStart + (90 * 24 * 60 * 60) -- Search next 90 days
+    set output to {}
+    set maxResults to 20
 
-        repeat with cal in calendars
-            if (count of output) ≥ maxResults then exit repeat
-            try
-                set calEvents to (every event of cal whose summary contains query and start date ≥ searchStart and start date ≤ searchEnd)
-                repeat with evt in calEvents
-                    if (count of output) ≥ maxResults then exit repeat
-                    set evtStart to start date of evt
-                    set evtTitle to summary of evt
-                    set timeStr to my formatDateTime(evtStart)
-                    set evtLine to timeStr & " | " & evtTitle & " [" & (name of cal) & "]"
-                    set end of output to evtLine
-                end repeat
-            end try
-        end repeat
+    try
+        tell application "Calendar"
+            with timeout of 120 seconds
+                set allCals to calendars
+            end timeout
+        end tell
+    on error errMsg
+        return "Error accessing Calendar app: " & errMsg
+    end try
 
-        if (count of output) is 0 then
-            return "No events found matching: " & query
-        end if
-        end timeout
-    end tell
+    set searchStart to current date
+    set searchEnd to searchStart + (90 * 24 * 60 * 60)
+
+    repeat with cal in allCals
+        if (count of output) ≥ maxResults then exit repeat
+        try
+            tell application "Calendar"
+                with timeout of 15 seconds
+                    set calName to name of cal
+                    set calEvents to (every event of cal whose summary contains query and start date ≥ searchStart and start date ≤ searchEnd)
+                    repeat with evt in calEvents
+                        if (count of output) ≥ maxResults then exit repeat
+                        set evtStart to start date of evt
+                        set evtTitle to summary of evt
+                        set timeStr to my formatDateTime(evtStart)
+                        set evtLine to timeStr & " | " & evtTitle & " [" & calName & "]"
+                        set end of output to evtLine
+                    end repeat
+                end timeout
+            end tell
+        on error errMsg
+            -- Skip this calendar silently
+        end try
+    end repeat
+
+    if (count of output) is 0 then
+        return "No events found matching: " & query
+    end if
+
     return my joinList(output, linefeed)
 end searchEvents
 
 -- Create a new event
 on createEvent(eventTitle, eventDateStr, durationStr, calendarName)
-    tell application "Calendar"
-        with timeout of 10 seconds
-        -- Find the calendar
-        set targetCal to missing value
-        repeat with cal in calendars
-            if name of cal is calendarName then
-                set targetCal to cal
-                exit repeat
-            end if
-        end repeat
+    try
+        tell application "Calendar"
+            with timeout of 30 seconds
+                -- Find the calendar
+                set targetCal to missing value
+                repeat with cal in calendars
+                    if name of cal is calendarName then
+                        set targetCal to cal
+                        exit repeat
+                    end if
+                end repeat
 
-        if targetCal is missing value then
-            -- Use first calendar as default
-            set targetCal to first calendar
-        end if
+                if targetCal is missing value then
+                    set targetCal to first calendar
+                end if
 
-        -- Parse duration (e.g., "1h", "30m", "1h30m")
-        set durationMins to my parseDuration(durationStr)
+                -- Parse duration
+                set durationMins to my parseDuration(durationStr)
 
-        -- Parse date - expect format like "2024-02-01 10:00"
-        set eventDate to my parseDateTime(eventDateStr)
-        set eventEndDate to eventDate + (durationMins * 60)
+                -- Parse date
+                set eventDate to my parseDateTime(eventDateStr)
+                set eventEndDate to eventDate + (durationMins * 60)
 
-        -- Create the event
-        tell targetCal
-            set newEvent to make new event with properties {summary:eventTitle, start date:eventDate, end date:eventEndDate}
+                -- Create the event
+                tell targetCal
+                    set newEvent to make new event with properties {summary:eventTitle, start date:eventDate, end date:eventEndDate}
+                end tell
+
+                return "OK: Created '" & eventTitle & "' on " & (eventDate as text) & " in " & (name of targetCal)
+            end timeout
         end tell
-
-        return "OK: Created '" & eventTitle & "' on " & (eventDate as text) & " in " & (name of targetCal)
-        end timeout
-    end tell
+    on error errMsg
+        return "Error creating event: " & errMsg
+    end try
 end createEvent
 
 -- Delete an event by title (deletes first match today or future)
 on deleteEvent(eventTitle)
-    tell application "Calendar"
-        with timeout of 10 seconds
-        set todayStart to current date
-        set time of todayStart to 0
+    try
+        tell application "Calendar"
+            with timeout of 30 seconds
+                set todayStart to current date
+                set time of todayStart to 0
 
-        repeat with cal in calendars
-            try
-                set matchingEvents to (every event of cal whose summary is eventTitle and start date ≥ todayStart)
-                if (count of matchingEvents) > 0 then
-                    set evt to item 1 of matchingEvents
-                    set evtDate to start date of evt
-                    delete evt
-                    return "OK: Deleted '" & eventTitle & "' from " & (evtDate as text)
-                end if
-            end try
-        end repeat
+                repeat with cal in calendars
+                    try
+                        set matchingEvents to (every event of cal whose summary is eventTitle and start date ≥ todayStart)
+                        if (count of matchingEvents) > 0 then
+                            set evt to item 1 of matchingEvents
+                            set evtDate to start date of evt
+                            delete evt
+                            return "OK: Deleted '" & eventTitle & "' from " & (evtDate as text)
+                        end if
+                    end try
+                end repeat
 
-        return "Event not found: " & eventTitle
-        end timeout
-    end tell
+                return "Event not found: " & eventTitle
+            end timeout
+        end tell
+    on error errMsg
+        return "Error deleting event: " & errMsg
+    end try
 end deleteEvent
 
 -- Helper: Format date/time for display
@@ -271,12 +327,9 @@ end parseDuration
 
 -- Helper: Parse date/time string (basic parser)
 on parseDateTime(dateStr)
-    -- Expect format: "YYYY-MM-DD HH:MM" or similar
-    -- This is a simplified parser - AppleScript's date parsing is locale-dependent
     try
         return date dateStr
     on error
-        -- Return tomorrow if parsing fails
         return (current date) + (24 * 60 * 60)
     end try
 end parseDateTime
