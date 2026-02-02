@@ -73,14 +73,6 @@ on run argv
         else
             return "Usage: mail.applescript send <to> <subject> <body> [--from=email] [attachment1] ..."
         end if
-    else if cmd is "draft" then
-        if (count of argv) > 4 then
-            return draftMessage(item 2 of argv, item 3 of argv, item 4 of argv, item 5 of argv)
-        else if (count of argv) > 3 then
-            return draftMessage(item 2 of argv, item 3 of argv, item 4 of argv, "")
-        else
-            return "Usage: mail.applescript draft <to> <subject> <body> [cc]"
-        end if
     else
         return "Unknown command: " & cmd
     end if
@@ -235,44 +227,6 @@ on sendMessage(toAddr, subjectText, bodyText, senderAddr, attachmentPaths)
         end if
     end tell
 end sendMessage
-
--- Save a message as draft (saves to Drafts folder and opens compose window)
-on draftMessage(toAddr, subjectText, bodyText, ccAddrs)
-    tell application "Mail"
-        activate
-        set newMessage to make new outgoing message with properties {subject:subjectText, content:bodyText, visible:true}
-        tell newMessage
-            make new to recipient at end of to recipients with properties {address:toAddr}
-            -- Add CC recipients (comma-separated)
-            if ccAddrs is not "" then
-                set oldDelims to AppleScript's text item delimiters
-                set AppleScript's text item delimiters to ","
-                set ccList to text items of ccAddrs
-                set AppleScript's text item delimiters to oldDelims
-                repeat with ccAddr in ccList
-                    set trimmedAddr to my trimText(ccAddr as text)
-                    if trimmedAddr is not "" then
-                        make new cc recipient at end of cc recipients with properties {address:trimmedAddr}
-                    end if
-                end repeat
-            end if
-        end tell
-        save newMessage
-        return "OK: Draft saved and opened in Mail for " & toAddr
-    end tell
-end draftMessage
-
--- Helper: Trim whitespace from text
-on trimText(theText)
-    set theChars to characters of theText
-    repeat while (count of theChars) > 0 and first item of theChars is " "
-        set theChars to rest of theChars
-    end repeat
-    repeat while (count of theChars) > 0 and last item of theChars is " "
-        set theChars to items 1 thru -2 of theChars
-    end repeat
-    return theChars as text
-end trimText
 
 -- Helper: Join list with delimiter
 on joinList(theList, delimiter)

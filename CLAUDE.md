@@ -24,8 +24,14 @@ macjuice mail list "Drafts"                          # List messages in a specif
 macjuice mail search "from:boss subject:urgent"      # Search emails
 macjuice mail read <message-id>                      # Read a specific email
 macjuice mail send "user@example.com" "Subject" "Body"   # Send an email
+macjuice mail send "user@example.com" "Subject" "Body" --from=me@icloud.com  # Send from specific account
 macjuice mail draft "user@example.com" "Subject" "Body"  # Save email as draft
+macjuice mail draft "user@example.com" "Subject" "Body" --from=me@icloud.com  # Draft from specific account
+macjuice mail draft "user@example.com" "Subject" "Body" --cc=a@x.com --bcc=b@x.com  # Draft with CC/BCC
+macjuice mail draft "user@example.com" "Subject" "Body" /path/to/file.pdf  # Draft with attachment
 ```
+
+The `--from=` flag controls which mail account is used, which determines which Drafts folder the draft is saved to (e.g., iCloud's "Cloud Drafts"). Use `macjuice mail accounts` to see available account addresses.
 
 ### Calendar
 
@@ -151,9 +157,9 @@ macjuice/
 
 ## Common Patterns When Using macjuice
 
-**Creating an email draft:**
+**Creating an email draft from a specific account:**
 ```bash
-macjuice mail draft "recipient@example.com" "Subject line" "Email body text here"
+macjuice mail draft "recipient@example.com" "Subject line" "Email body text here" --from=me@icloud.com
 ```
 
 **Checking today's schedule:**
