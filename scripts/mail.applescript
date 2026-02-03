@@ -226,17 +226,36 @@ on draftMessage(toAddr, subjectText, bodyText, senderAddr, ccAddr, bccAddr, atta
                 make new attachment with properties {file name:attachFile} at after the last paragraph
             end repeat
         end tell
-        -- Find and close the NEW compose window (the one that wasn't there before)
+        -- Find the NEW compose window and close it to trigger save-as-draft dialog
         delay 1
+        set composeWindowName to ""
         repeat with w in windows
             try
                 set wId to id of w
                 if windowIdsBefore does not contain wId then
-                    close w saving yes
+                    set composeWindowName to name of w
+                    close w
                     exit repeat
                 end if
             end try
         end repeat
+    end tell
+    -- Click "Save" in the save-as-draft dialog sheet
+    delay 1
+    tell application "System Events"
+        tell process "Mail"
+            set frontmost to true
+            -- Find the window with the sheet dialog and click Save
+            repeat with w in windows
+                try
+                    click button "Save" of sheet 1 of w
+                    exit repeat
+                end try
+            end repeat
+        end tell
+    end tell
+    delay 1
+    tell application "Mail"
         -- Build status message
         set fromNote to ""
         if senderAddr is not "" then

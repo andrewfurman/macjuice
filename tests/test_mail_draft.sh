@@ -28,15 +28,12 @@ else
     exit 1
 fi
 
-# 2. Wait for Mail to sync the draft to the mailbox
-echo -n "Waiting for sync... "
-sleep 10
-echo "done"
-
-# Verify draft exists by searching Drafts mailboxes directly via AppleScript
-# This avoids IMAP sync latency by searching the local mailbox immediately
+# 2. Poll for draft in Drafts folder (retry up to 30s for Mail sync)
 echo -n "Verifying draft in Drafts folder... "
-FOUND=$(osascript -e "
+FOUND=""
+for i in $(seq 1 6); do
+    sleep 5
+    FOUND=$(osascript -e "
 tell application \"Mail\"
     repeat with acc in accounts
         try
@@ -49,11 +46,15 @@ tell application \"Mail\"
     end repeat
     return \"\"
 end tell" 2>/dev/null)
+    if [[ -n "$FOUND" ]]; then
+        break
+    fi
+done
 
 if [[ -n "$FOUND" ]]; then
     echo -e "${GREEN}PASS${NC} (id: $FOUND)"
 else
-    echo -e "${RED}FAIL${NC} — draft not found in Drafts mailbox"
+    echo -e "${RED}FAIL${NC} — draft not found in Drafts mailbox after 30s"
     exit 1
 fi
 

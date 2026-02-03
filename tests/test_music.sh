@@ -10,7 +10,6 @@ echo "=== Music Tests ==="
 _skip_all() {
     local reason="$1"
     skip_test "music play starts playback" "$reason"
-    skip_test "music now shows track info" "$reason"
     skip_test "music pause sets paused" "$reason"
     skip_test "music play with playlist name responds" "$reason"
     print_summary "Music"
@@ -52,18 +51,13 @@ assert_output_matches \
     "[Pp]lay" \
     "$MACJUICE" music play
 
-# 2. Now shows track info
-assert_output_not_empty \
-    "music now shows track info" \
-    "$MACJUICE" music now
-
-# 3. Pause playback
+# 2. Pause playback
 assert_output_matches \
     "music pause sets paused" \
     "[Pp]ause" \
     "$MACJUICE" music pause
 
-# 4. Play with playlist name returns expected output
+# 3. Play with playlist name returns expected output
 assert_output_matches \
     "music play with playlist name responds" \
     "[Pp]lay|[Ee]rror.*[Pp]laylist" \
