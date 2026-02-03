@@ -33,7 +33,7 @@ assert_exit_zero \
     "mail draft exits 0" \
     "$MACJUICE" mail draft "test@example.com" "macjuice test draft" "This is an automated test draft from macjuice."
 
-# 6. mail draft output confirms success (himalaya saves to Drafts, AppleScript opens in Mail)
+# 6. mail draft output confirms success
 assert_output_matches \
     "mail draft output confirms draft saved" \
     "OK:.*Draft saved" \
@@ -113,36 +113,11 @@ assert_output_matches \
     "delete-draft.*Delete a draft" \
     "$MACJUICE" mail --help
 
-# 20. End-to-end: create a draft then delete it
-# Create a uniquely-named draft so we can find and delete it
-_E2E_TS=$(date +%s)
-_E2E_SUBJECT="macjuice-delete-test-${_E2E_TS}"
-_run_cmd "$MACJUICE" mail draft "deletetest@example.com" "$_E2E_SUBJECT" "Draft to be deleted"
-if [[ $? -eq 0 ]]; then
-    # Wait for IMAP sync
-    sleep 2
-    # Find the draft ID via himalaya
-    _DRAFT_ID=""
-    if command -v himalaya &>/dev/null; then
-        _DRAFT_ID=$(himalaya envelope list -f "[Gmail]/Drafts" -o json 2>/dev/null \
-            | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-for e in data:
-    if '${_E2E_TS}' in e.get('subject',''):
-        print(e['id'])
-        break
-" 2>/dev/null)
-    fi
-    if [[ -n "$_DRAFT_ID" ]]; then
-        assert_exit_zero \
-            "delete-draft removes a draft by ID" \
-            "$MACJUICE" mail delete-draft "$_DRAFT_ID"
-    else
-        skip_test "delete-draft removes a draft by ID" "could not find draft ID (himalaya unavailable or sync pending)"
-    fi
-else
-    skip_test "delete-draft removes a draft by ID" "draft creation failed"
-fi
+# 20. mail list Drafts exits 0 (verifies Drafts mailbox is accessible)
+assert_exit_zero \
+    "mail list Drafts exits 0" \
+    "$MACJUICE" mail list Drafts
+
+# End-to-end delete-draft testing is covered by test_mail_draft.sh
 
 print_summary "Mail"

@@ -126,7 +126,10 @@ on listMessages(mailboxName)
         repeat with acc in accounts
             try
                 set mb to mailbox mailboxName of acc
-                set msgs to messages 1 thru maxMessages of mb
+                set msgCount to count of messages of mb
+                if msgCount is 0 then error "empty"
+                if msgCount > maxMessages then set msgCount to maxMessages
+                set msgs to messages 1 thru msgCount of mb
                 repeat with msg in msgs
                     set msgLine to (id of msg as text) & " | " & (date sent of msg as text) & " | " & (sender of msg) & " | " & (subject of msg)
                     set end of output to msgLine
@@ -189,6 +192,14 @@ end readMessage
 -- Create a draft message and save it to the Drafts folder
 on draftMessage(toAddr, subjectText, bodyText, senderAddr, ccAddr, bccAddr, attachmentPaths)
     tell application "Mail"
+        activate
+        -- Track which windows exist before creating the compose window
+        set windowIdsBefore to {}
+        repeat with w in windows
+            try
+                set end of windowIdsBefore to id of w
+            end try
+        end repeat
         set newMessage to make new outgoing message with properties {subject:subjectText, content:bodyText, visible:true}
         tell newMessage
             make new to recipient at end of to recipients with properties {address:toAddr}
@@ -215,9 +226,17 @@ on draftMessage(toAddr, subjectText, bodyText, senderAddr, ccAddr, bccAddr, atta
                 make new attachment with properties {file name:attachFile} at after the last paragraph
             end repeat
         end tell
-        -- Save as draft: close the compose window which triggers save-to-Drafts
-        delay 0.5
-        close window 1 saving yes
+        -- Find and close the NEW compose window (the one that wasn't there before)
+        delay 1
+        repeat with w in windows
+            try
+                set wId to id of w
+                if windowIdsBefore does not contain wId then
+                    close w saving yes
+                    exit repeat
+                end if
+            end try
+        end repeat
         -- Build status message
         set fromNote to ""
         if senderAddr is not "" then

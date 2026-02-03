@@ -1,5 +1,5 @@
 #!/bin/bash
-# test_mail_draft.sh — Test macjuice mail draft command
+# test_mail_draft.sh — Test macjuice mail draft create + verify + delete
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,33 +28,65 @@ else
     exit 1
 fi
 
-# 2. Wait for IMAP sync
+# 2. Wait for Mail to sync the draft to the mailbox
 echo -n "Waiting for sync... "
-sleep 2
+sleep 10
 echo "done"
 
-# 3. Search for the draft in [Gmail]/Drafts via himalaya
+# Verify draft exists by searching Drafts mailboxes directly via AppleScript
+# This avoids IMAP sync latency by searching the local mailbox immediately
 echo -n "Verifying draft in Drafts folder... "
-FOUND=$(himalaya envelope list -f "[Gmail]/Drafts" -o json 2>/dev/null \
-    | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-for e in data:
-    if '${TIMESTAMP}' in e.get('subject',''):
-        print(e['id'])
-        break
-" 2>/dev/null)
+FOUND=$(osascript -e "
+tell application \"Mail\"
+    repeat with acc in accounts
+        try
+            set mb to mailbox \"Drafts\" of acc
+            set msgs to (every message of mb whose subject contains \"${TIMESTAMP}\")
+            if (count of msgs) > 0 then
+                return id of item 1 of msgs as text
+            end if
+        end try
+    end repeat
+    return \"\"
+end tell" 2>/dev/null)
 
 if [[ -n "$FOUND" ]]; then
     echo -e "${GREEN}PASS${NC} (id: $FOUND)"
 else
-    echo -e "${RED}FAIL${NC} — draft not found in [Gmail]/Drafts"
+    echo -e "${RED}FAIL${NC} — draft not found in Drafts mailbox"
     exit 1
 fi
 
-# 4. Cleanup — delete the test draft
-echo -n "Cleaning up... "
-himalaya flag add -f "[Gmail]/Drafts" "$FOUND" -- deleted 2>/dev/null && echo "done" || echo "skipped"
+# Delete the test draft
+echo -n "Deleting draft... "
+DEL_OUTPUT=$("$MACJUICE" mail delete-draft "$FOUND" 2>&1)
+if echo "$DEL_OUTPUT" | grep -q "OK:"; then
+    echo -e "${GREEN}PASS${NC}"
+else
+    echo -e "${RED}FAIL${NC} — $DEL_OUTPUT"
+    exit 1
+fi
+
+# Verify draft is gone
+echo -n "Verifying deletion... "
+STILL_THERE=$(osascript -e "
+tell application \"Mail\"
+    repeat with acc in accounts
+        try
+            set mb to mailbox \"Drafts\" of acc
+            set msgs to (every message of mb whose subject contains \"${TIMESTAMP}\")
+            if (count of msgs) > 0 then return \"found\"
+        end try
+    end repeat
+    return \"gone\"
+end tell" 2>/dev/null)
+
+if [[ "$STILL_THERE" == "gone" ]]; then
+    echo -e "${GREEN}PASS${NC}"
+else
+    echo -e "${RED}FAIL${NC} — draft still exists after deletion"
+    exit 1
+fi
 
 echo ""
 echo -e "${GREEN}All tests passed!${NC}"

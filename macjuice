@@ -303,32 +303,6 @@ main() {
                         esac
                     done
 
-                    # Try himalaya (IMAP) first — clean, no UI, reliable
-                    if command -v himalaya &>/dev/null; then
-                        # Build RFC822 message
-                        local msg=""
-                        local from_addr="${account:-aifurman@gmail.com}"
-                        msg="From: ${from_addr}"$'\n'
-                        msg+="To: ${to_addr}"$'\n'
-                        msg+="Subject: ${subject}"$'\n'
-                        [[ -n "$cc" ]] && msg+="Cc: ${cc}"$'\n'
-                        [[ -n "$bcc" ]] && msg+="Bcc: ${bcc}"$'\n'
-                        [[ -n "$reply_to" ]] && msg+="In-Reply-To: ${reply_to}"$'\n'
-                        msg+="Content-Type: text/plain; charset=utf-8"$'\n'
-                        msg+="MIME-Version: 1.0"$'\n'
-                        msg+=$'\n'
-                        msg+="${body}"
-
-                        if echo "$msg" | himalaya message save -f "[Gmail]/Drafts" 2>&1 | grep -q "successfully saved"; then
-                            local extras=""
-                            [[ -n "$cc" ]] && extras+=" cc:${cc}"
-                            [[ -n "$bcc" ]] && extras+=" bcc:${bcc}"
-                            echo -e "${GREEN}OK:${NC} Draft saved to Drafts for ${to_addr}${extras}"
-                            exit 0
-                        fi
-                    fi
-
-                    # Fallback: AppleScript (opens Mail, creates compose window, saves)
                     local args=("$to_addr" "$subject" "$body")
                     [[ -n "$account" ]] && args+=("--from=$account")
                     [[ -n "$cc" ]] && args+=("--cc=$cc")
@@ -405,16 +379,6 @@ main() {
                         exit 1
                     fi
                     local msg_id="$1"
-
-                    # Try himalaya (IMAP) first
-                    if command -v himalaya &>/dev/null; then
-                        if himalaya flag add -f "[Gmail]/Drafts" "$msg_id" -- deleted 2>&1 | grep -qiE "done|success|flag"; then
-                            echo -e "${GREEN}OK:${NC} Draft deleted (id: ${msg_id})"
-                            exit 0
-                        fi
-                    fi
-
-                    # Fallback: AppleScript
                     run_applescript "mail" "delete-draft" "$msg_id"
                     ;;
                 *)
@@ -438,7 +402,17 @@ main() {
                     ;;
             esac
             ;;
-        notes|calendar|music|contacts|reminders|shortcuts)
+        calendar)
+            case "$cmd" in
+                list|today|week|upcoming|search)
+                    python3 "$SCRIPTS_DIR/calendar_read.py" "$cmd" "$@"
+                    ;;
+                *)
+                    run_applescript "calendar" "$cmd" "$@"
+                    ;;
+            esac
+            ;;
+        notes|music|contacts|reminders|shortcuts)
             run_applescript "$app" "$cmd" "$@"
             ;;
         home)
