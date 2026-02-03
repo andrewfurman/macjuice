@@ -75,6 +75,12 @@ on run argv
         else
             return "Usage: mail.applescript reply <message-id> <body> [--from=email] [--cc=emails] [--bcc=emails]"
         end if
+    else if cmd is "delete-draft" then
+        if (count of argv) > 1 then
+            return deleteDraft(item 2 of argv)
+        else
+            return "Usage: mail.applescript delete-draft <message-id>"
+        end if
     else if cmd is "send" then
         if (count of argv) > 3 then
             set senderAddr to ""
@@ -255,6 +261,23 @@ on sendMessage(toAddr, subjectText, bodyText, senderAddr, attachmentPaths)
         end if
     end tell
 end sendMessage
+
+-- Delete a draft message by ID
+on deleteDraft(messageId)
+    tell application "Mail"
+        repeat with acc in accounts
+            repeat with mb in mailboxes of acc
+                try
+                    set msg to (first message of mb whose id is messageId)
+                    set subj to subject of msg
+                    delete msg
+                    return "OK: Draft deleted (subject: " & subj & ")"
+                end try
+            end repeat
+        end repeat
+        return "Message not found: " & messageId
+    end tell
+end deleteDraft
 
 -- Reply-all to an existing message (saves as draft, preserves quoted thread)
 on replyMessage(messageId, bodyText, senderAddr, ccAddr, bccAddr)

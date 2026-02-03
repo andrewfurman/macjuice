@@ -35,7 +35,10 @@ macjuice mail reply <message-id> "Reply body" --from=me@icloud.com  # Reply from
 macjuice mail reply <message-id> "Reply body" --cc=extra@x.com,other@x.com  # Reply with extra CC
 macjuice mail reply <message-id> "Reply body" --bcc=hidden@x.com  # Reply with BCC
 macjuice mail reply --search "subject query" "Reply body"  # Search and reply
+macjuice mail delete-draft <message-id>                   # Delete a draft by ID
 ```
+
+Use `macjuice mail list Drafts` to find draft message IDs for deletion.
 
 The `--cc` and `--bcc` flags accept comma-separated email addresses for multiple recipients.
 

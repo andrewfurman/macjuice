@@ -98,6 +98,7 @@ show_app_help() {
             echo "  read <message-id>     Read a specific email"
             echo "  send <to> <subj> <body>  Send an email"
             echo "  draft <to> <subj> <body> Save a draft email"
+            echo "  delete-draft <id>     Delete a draft by message ID"
             echo "  reply <id> <body>     Reply to a message (saves as draft)"
             echo ""
             echo "Draft options:"
@@ -394,6 +395,27 @@ main() {
                     [[ -n "$cc" ]] && args+=("--cc=$cc")
                     [[ -n "$bcc" ]] && args+=("--bcc=$bcc")
                     run_applescript "mail" "reply" "${args[@]}"
+                    ;;
+                delete-draft)
+                    # Parse: macjuice mail delete-draft <message-id>
+                    if [[ $# -lt 1 ]]; then
+                        echo -e "${RED}Error:${NC} delete-draft requires a message ID"
+                        echo "Usage: macjuice mail delete-draft <message-id>"
+                        echo "       Use 'macjuice mail list Drafts' to find draft message IDs."
+                        exit 1
+                    fi
+                    local msg_id="$1"
+
+                    # Try himalaya (IMAP) first
+                    if command -v himalaya &>/dev/null; then
+                        if himalaya flag add -f "[Gmail]/Drafts" "$msg_id" -- deleted 2>&1 | grep -qiE "done|success|flag"; then
+                            echo -e "${GREEN}OK:${NC} Draft deleted (id: ${msg_id})"
+                            exit 0
+                        fi
+                    fi
+
+                    # Fallback: AppleScript
+                    run_applescript "mail" "delete-draft" "$msg_id"
                     ;;
                 *)
                     run_applescript "mail" "$cmd" "$@"
