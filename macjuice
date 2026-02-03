@@ -303,11 +303,12 @@ main() {
                         esac
                     done
 
-                    local args=("$to_addr" "$subject" "$body")
-                    [[ -n "$account" ]] && args+=("--from=$account")
-                    [[ -n "$cc" ]] && args+=("--cc=$cc")
-                    [[ -n "$bcc" ]] && args+=("--bcc=$bcc")
-                    run_applescript "mail" "draft" "${args[@]}"
+                    # Save draft via AppleScript (uses Mail.app compose window)
+                    local as_args=("$to_addr" "$subject" "$body")
+                    [[ -n "$account" ]] && as_args+=("--from=$account")
+                    [[ -n "$cc" ]] && as_args+=("--cc=$cc")
+                    [[ -n "$bcc" ]] && as_args+=("--bcc=$bcc")
+                    run_applescript "mail" "draft" "${as_args[@]}"
                     ;;
                 reply)
                     # Parse: macjuice mail reply <message-id-or-search> <body> [--from=email] [--cc=emails] [--bcc=emails]

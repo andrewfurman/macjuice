@@ -144,7 +144,7 @@ macjuice facetime "user@icloud.com" audio  # Audio-only call
 macjuice/
 ├── macjuice                  # Main bash entry point - routes commands to scripts
 ├── scripts/
-│   ├── mail.applescript      # Mail: list, search, read, send, draft
+│   ├── mail.applescript      # Mail: list, search, read, send, draft, reply, delete-draft
 │   ├── calendar.applescript  # Calendar: today, week, upcoming, search, create, delete
 │   ├── notes.applescript     # Notes: list, folders, create, read, search
 │   ├── messages.applescript  # Messages: chats, send, read, recent, search
@@ -189,6 +189,10 @@ On first run, macOS will prompt for:
 - **Automation** - Required for AppleScript to control apps
 - **Full Disk Access** - Required for Mail and Photos
 - **Contacts** - Required for Contacts access
+
+## Dependencies
+
+MacJuice does **not** use himalaya or any external IMAP CLI tools. It exclusively interacts with Apple Mail.app via AppleScript for all mail operations: reading, searching, sending, drafting, replying, and deleting drafts. No third-party packages or external tools are required.
 
 ## Troubleshooting
 
