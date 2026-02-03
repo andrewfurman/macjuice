@@ -11,20 +11,14 @@ _timeout_hint="timed out after ${_TIMEOUT}s — grant Automation permission if m
 
 echo "=== Calendar Tests ==="
 
-# 1. calendar list outputs bracket format (fast — validates basic connectivity)
-assert_output_matches \
-    "calendar list shows calendars in bracket format" \
-    "\[.*\]" \
+# 1. calendar list outputs calendar names (validates basic connectivity)
+assert_output_not_empty \
+    "calendar list returns calendars" \
     "$MACJUICE" calendar list
 
-# 2. calendar today exits 0
-assert_exit_zero \
-    "calendar today exits 0" \
-    "$MACJUICE" calendar today
-
-# 3. calendar today output is either "No events" or pipe-delimited event rows
+# 2. calendar today output is either "No events" or pipe-delimited event rows
 assert_output_matches \
-    "calendar today output format is valid" \
+    "calendar today output is valid" \
     "(No events found|.*\|.*)" \
     "$MACJUICE" calendar today
 

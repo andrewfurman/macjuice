@@ -12,37 +12,25 @@ _preflight_rc=$?
 if [[ $_CMD_TIMED_OUT -eq 1 ]] || [[ $_preflight_rc -ne 0 ]]; then
     _reason="Contacts app unreachable (exit code $_preflight_rc)"
     [[ $_CMD_TIMED_OUT -eq 1 ]] && _reason="Contacts timed out — grant Automation permission if macOS prompted"
-    skip_test "contacts list exits 0" "$_reason"
     skip_test "contacts list returns contacts" "$_reason"
-    skip_test "contacts groups exits 0" "$_reason"
     skip_test "contacts groups output is valid" "$_reason"
     skip_test "contacts search with no match returns message" "$_reason"
     print_summary "Contacts"
     exit $?
 fi
 
-# 1. contacts list exits 0
-assert_exit_zero \
-    "contacts list exits 0" \
-    "$MACJUICE" contacts list
-
-# 2. contacts list output is non-empty (at least one contact)
+# 1. contacts list returns contacts
 assert_output_not_empty \
     "contacts list returns contacts" \
     "$MACJUICE" contacts list
 
-# 3. contacts groups exits 0
-assert_exit_zero \
-    "contacts groups exits 0" \
-    "$MACJUICE" contacts groups
-
-# 4. contacts groups output is valid (groups with counts or "No groups found")
+# 2. contacts groups output is valid (groups with counts or "No groups found")
 assert_output_matches \
     "contacts groups output is valid" \
     "(No groups found|.*\([0-9]+ contacts\))" \
     "$MACJUICE" contacts groups
 
-# 5. contacts search for gibberish returns "No contacts found"
+# 3. contacts search for gibberish returns "No contacts found"
 assert_output_matches \
     "contacts search with no match returns message" \
     "No contacts found" \

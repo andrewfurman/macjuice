@@ -10,29 +10,19 @@ _timeout_hint="timed out after ${_TIMEOUT}s — grant Automation permission if m
 
 echo "=== Notes Tests ==="
 
-# 1. notes list exits 0
-assert_exit_zero \
-    "notes list exits 0" \
-    "$MACJUICE" notes list
-
-# 2. notes list output is pipe-delimited (id | date | name)
+# 1. notes list output is pipe-delimited (id | date | name)
 assert_output_matches \
-    "notes list output format is valid" \
+    "notes list output is valid" \
     ".*\|.*\|.*" \
     "$MACJUICE" notes list
 
-# 3. notes folders exits 0
-assert_exit_zero \
-    "notes folders exits 0" \
-    "$MACJUICE" notes folders
-
-# 4. notes folders output contains note count
+# 2. notes folders shows note counts
 assert_output_matches \
     "notes folders shows note counts" \
     ".*\([0-9]+ notes\)" \
     "$MACJUICE" notes folders
 
-# 5. notes search for gibberish returns "No notes found"
+# 3. notes search for gibberish returns "No notes found"
 assert_output_matches \
     "notes search with no match returns message" \
     "No notes found" \

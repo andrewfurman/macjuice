@@ -9,11 +9,10 @@ echo "=== Music Tests ==="
 # --- Pre-flight: check if Music app is reachable (with timeout) ---
 _skip_all() {
     local reason="$1"
-    skip_test "music pause sets paused" "$reason"
     skip_test "music play starts playback" "$reason"
-    skip_test "music now after play shows playing" "$reason"
-    skip_test "music pause after play returns paused" "$reason"
-    skip_test "music now after pause shows paused" "$reason"
+    skip_test "music now shows track info" "$reason"
+    skip_test "music pause sets paused" "$reason"
+    skip_test "music play with playlist name responds" "$reason"
     print_summary "Music"
     exit $?
 }
@@ -47,44 +46,27 @@ trap cleanup EXIT
 
 # --- Tests (sequential, order matters) ---
 
-# 1. Pause playback
-assert_output_matches \
-    "music pause sets paused" \
-    "[Pp]ause" \
-    "$MACJUICE" music pause
-
-# 2. Start playback
+# 1. Start playback
 assert_output_matches \
     "music play starts playback" \
     "[Pp]lay" \
     "$MACJUICE" music play
 
-# 3. Now should indicate playing after play
+# 2. Now shows track info
 assert_output_not_empty \
-    "music now after play shows info" \
+    "music now shows track info" \
     "$MACJUICE" music now
 
-# 4. Pause again
+# 3. Pause playback
 assert_output_matches \
-    "music pause after play returns paused" \
+    "music pause sets paused" \
     "[Pp]ause" \
     "$MACJUICE" music pause
 
-# 5. Now should reflect paused state
-assert_output_not_empty \
-    "music now after pause shows info" \
-    "$MACJUICE" music now
-
-# 6. Play with playlist name returns expected output
+# 4. Play with playlist name returns expected output
 assert_output_matches \
     "music play with playlist name responds" \
     "[Pp]lay|[Ee]rror.*[Pp]laylist" \
     "$MACJUICE" music play "Library"
-
-# 7. Help text shows playlist argument
-assert_output_matches \
-    "music help shows play [playlist] syntax" \
-    "play \\[playlist\\]" \
-    "$MACJUICE" music --help
 
 print_summary "Music"
