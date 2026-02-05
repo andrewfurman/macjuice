@@ -413,7 +413,24 @@ main() {
                     ;;
             esac
             ;;
-        notes|music|contacts|reminders|shortcuts)
+        notes)
+            case "$cmd" in
+                list|folders|read|search)
+                    # Use fast SQLite reader (AppleScript hangs on Notes)
+                    python3 "$SCRIPTS_DIR/notes_read.py" "$cmd" "$@"
+                    ;;
+                create)
+                    # Create still needs AppleScript
+                    run_applescript "notes" "$cmd" "$@"
+                    ;;
+                *)
+                    echo -e "${RED}Error:${NC} Unknown notes command: $cmd"
+                    show_app_help notes
+                    exit 1
+                    ;;
+            esac
+            ;;
+        music|contacts|reminders|shortcuts)
             run_applescript "$app" "$cmd" "$@"
             ;;
         home)
