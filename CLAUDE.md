@@ -85,6 +85,7 @@ macjuice messages search "keyword"                     # Search messages
 ```bash
 macjuice music play                        # Start playback
 macjuice music play "The Lounge"           # Play a specific playlist
+macjuice music open "Live Sheck Wes"       # Search Apple Music catalog and play
 macjuice music pause                       # Pause playback
 macjuice music toggle                      # Toggle play/pause
 macjuice music next                        # Next track

@@ -150,6 +150,7 @@ show_app_help() {
             echo ""
             echo "Commands:"
             echo "  play [playlist]       Start playback (optionally from a playlist)"
+            echo "  open <query>          Search Apple Music catalog and play a song"
             echo "  pause                 Pause playback"
             echo "  toggle                Toggle play/pause"
             echo "  next                  Next track"
@@ -430,7 +431,164 @@ main() {
                     ;;
             esac
             ;;
-        music|contacts|reminders|shortcuts)
+        music)
+            case "$cmd" in
+                open)
+                    # Search Apple Music catalog and play the best matching song
+                    # Supports: "song name" or "song name by artist"
+                    if [[ $# -lt 1 ]]; then
+                        echo -e "${RED}Error:${NC} open requires a search query"
+                        echo "Usage: macjuice music open <query>"
+                        echo "       macjuice music open \"<song> by <artist>\""
+                        exit 1
+                    fi
+                    local query="$*"
+
+                    local best_match
+                    best_match=$(python3 - "$query" <<'PYEOF'
+import sys, urllib.parse, urllib.request, json
+
+query = sys.argv[1]
+query_lower = query.lower()
+
+# Check for "by" syntax to separate song and artist
+song_query = query
+artist_filter = None
+if " by " in query_lower:
+    parts = query.rsplit(" by ", 1)
+    song_query = parts[0].strip()
+    artist_filter = parts[1].strip().lower()
+
+# Step 1: Try regular search
+encoded = urllib.parse.quote(query)
+url = f"https://itunes.apple.com/search?term={encoded}&media=music&entity=song&limit=25"
+try:
+    resp = urllib.request.urlopen(url)
+    data = json.load(resp)
+except Exception:
+    data = {"resultCount": 0, "results": []}
+
+candidates = list(data["results"])
+
+# Step 2: If artist specified, also search for artist and look up their tracks
+if artist_filter:
+    try:
+        artist_encoded = urllib.parse.quote(artist_filter)
+        artist_url = f"https://itunes.apple.com/search?term={artist_encoded}&media=music&entity=musicArtist&limit=3"
+        aresp = urllib.request.urlopen(artist_url)
+        adata = json.load(aresp)
+        for artist_result in adata.get("results", []):
+            artist_id = artist_result.get("artistId")
+            if artist_id:
+                lookup_url = f"https://itunes.apple.com/lookup?id={artist_id}&entity=song&limit=200"
+                lresp = urllib.request.urlopen(lookup_url)
+                ldata = json.load(lresp)
+                for r in ldata.get("results", []):
+                    if r.get("wrapperType") == "track":
+                        candidates.append(r)
+    except Exception:
+        pass
+
+if not candidates:
+    print("ERROR:No songs found")
+    sys.exit(0)
+
+# Step 3: Score candidates
+song_lower = song_query.lower()
+song_words = set(song_lower.split())
+best = None
+best_score = -1
+
+# Deduplicate by trackId
+seen = set()
+unique = []
+for r in candidates:
+    tid = r.get("trackId")
+    if tid not in seen:
+        seen.add(tid)
+        unique.append(r)
+
+for r in unique:
+    track = r["trackName"].lower()
+    artist = r["artistName"].lower()
+    score = 0
+
+    # Exact track name match
+    if track == song_lower:
+        score += 100
+    elif song_lower in track or track in song_lower:
+        score += 50
+
+    # Word overlap between song query and track name
+    track_words = set(track.replace(".", " ").split())
+    overlap = song_words & track_words
+    score += len(overlap) * 15
+
+    # Artist filter match (strong bonus)
+    if artist_filter:
+        if artist_filter == artist:
+            score += 80
+        elif artist_filter in artist:
+            score += 60
+        elif any(w in artist for w in artist_filter.split()):
+            score += 40
+
+    if score > best_score:
+        best_score = score
+        best = r
+
+r = best
+# Return: trackName, artistName, collectionName, trackViewUrl, trackNumber, collectionViewUrl
+col_url = r.get("collectionViewUrl", r["trackViewUrl"])
+print(f'{r["trackName"]}\t{r["artistName"]}\t{r["collectionName"]}\t{r["trackViewUrl"]}\t{r.get("trackNumber",1)}\t{col_url}')
+PYEOF
+)
+
+                    if [[ "$best_match" == ERROR:* ]]; then
+                        echo -e "${RED}Error:${NC} No songs found for: $query"
+                        exit 1
+                    fi
+
+                    local track_name artist_name album_name track_url track_number album_url
+                    IFS=$'\t' read -r track_name artist_name album_name track_url track_number album_url <<< "$best_match"
+
+                    echo -e "${GREEN}Found:${NC} $track_name - $artist_name [$album_name]"
+                    echo "Opening in Music..."
+
+                    # Open the album page, click Play via UI, then skip to the right track
+                    open "$album_url"
+                    sleep 5
+
+                    osascript -e '
+                        tell application "Music" to activate
+                        delay 1
+                        tell application "System Events"
+                            tell process "Music"
+                                try
+                                    click button "Play" of UI element 1 of list 1 of list 1 of scroll area 2 of splitter group 1 of front window
+                                end try
+                            end tell
+                        end tell
+                    '
+
+                    # Wait for playback to start, then skip to the right track
+                    sleep 3
+                    if [[ "$track_number" -gt 1 ]]; then
+                        local skips=$((track_number - 1))
+                        for ((i=0; i<skips; i++)); do
+                            osascript -e 'tell application "Music" to next track'
+                            sleep 0.5
+                        done
+                    fi
+
+                    echo -e "${GREEN}▶${NC} Now playing: $track_name - $artist_name"
+                    ;;
+                *)
+                    run_applescript "music" "$cmd" "$@"
+                    ;;
+            esac
+            ;;
+        contacts|reminders|shortcuts)
             run_applescript "$app" "$cmd" "$@"
             ;;
         home)
