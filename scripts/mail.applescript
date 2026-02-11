@@ -365,15 +365,26 @@ on replyMessage(messageId, bodyText, senderAddr, ccAddr, bccAddr)
                         end tell
                     end if
                     -- Wait for compose window to fully load with quoted content
-                    delay 1.5
-                    -- Insert body text by prepending to the existing content
-                    -- This preserves the quoted thread below
-                    tell replyMsg
-                        set existingContent to content
-                        set content to bodyText & linefeed & linefeed & existingContent
+                    delay 2
+                    -- Insert body text via clipboard paste at cursor position
+                    -- (cursor starts at top of reply body, above quoted thread)
+                    -- Setting the content property directly wipes the HTML-formatted
+                    -- quoted thread, so clipboard paste is the reliable approach
+                    set oldClipboard to the clipboard
+                    set the clipboard to bodyText & linefeed & linefeed
+                    tell application "Mail"
+                        activate
                     end tell
                     delay 0.5
-                    -- Save as draft (don't close -- leave open for review)
+                    tell application "System Events"
+                        tell process "Mail"
+                            set frontmost to true
+                            delay 0.3
+                            keystroke "v" using command down
+                        end tell
+                    end tell
+                    delay 0.5
+                    set the clipboard to oldClipboard
                     -- Build status message
                     set extras to ""
                     if ccAddr is not "" then
