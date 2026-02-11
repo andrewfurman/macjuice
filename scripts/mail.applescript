@@ -339,33 +339,41 @@ on replyMessage(messageId, bodyText, senderAddr, ccAddr, bccAddr)
                             end repeat
                         end tell
                     end if
-                    -- Add BCC recipients (supports comma-separated list)
+                    -- Collect existing To/CC/BCC addresses to avoid duplicates
+                    set existingAddrs to {}
+                    tell replyMsg
+                        repeat with r in to recipients
+                            set end of existingAddrs to address of r
+                        end repeat
+                        repeat with r in cc recipients
+                            set end of existingAddrs to address of r
+                        end repeat
+                        repeat with r in bcc recipients
+                            set end of existingAddrs to address of r
+                        end repeat
+                    end tell
+                    -- Add BCC recipients, skipping any already in To/CC/BCC
                     if bccAddr is not "" then
                         set bccList to my splitCommaList(bccAddr)
                         tell replyMsg
                             repeat with addr in bccList
-                                make new bcc recipient at end of bcc recipients with properties {address:addr}
+                                set addrText to addr as text
+                                if existingAddrs does not contain addrText then
+                                    make new bcc recipient at end of bcc recipients with properties {address:addrText}
+                                end if
                             end repeat
                         end tell
                     end if
                     -- Wait for compose window to fully load with quoted content
                     delay 1.5
-                    -- Use clipboard paste to insert body text at cursor position
-                    -- The cursor starts at the top of the reply body, so pasting here
-                    -- preserves the quoted thread below
-                    set oldClipboard to the clipboard
-                    set the clipboard to bodyText & linefeed & linefeed
-                    tell application "System Events"
-                        tell process "Mail"
-                            set frontmost to true
-                            keystroke "v" using command down
-                        end tell
+                    -- Insert body text by prepending to the existing content
+                    -- This preserves the quoted thread below
+                    tell replyMsg
+                        set existingContent to content
+                        set content to bodyText & linefeed & linefeed & existingContent
                     end tell
                     delay 0.5
-                    set the clipboard to oldClipboard
-                    -- Save as draft
-                    delay 0.5
-                    close window 1 saving yes
+                    -- Save as draft (don't close -- leave open for review)
                     -- Build status message
                     set extras to ""
                     if ccAddr is not "" then
@@ -374,7 +382,7 @@ on replyMessage(messageId, bodyText, senderAddr, ccAddr, bccAddr)
                     if bccAddr is not "" then
                         set extras to extras & " bcc:" & bccAddr
                     end if
-                    return "OK: Reply-all draft saved (to " & sender of origMsg & ", re: " & subject of origMsg & ")" & extras
+                    return "OK: Reply-all draft opened (to " & sender of origMsg & ", re: " & subject of origMsg & ")" & extras
                 end try
             end repeat
         end repeat
