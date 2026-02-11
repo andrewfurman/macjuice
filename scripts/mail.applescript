@@ -152,7 +152,16 @@ on searchMessages(query)
 
         repeat with acc in accounts
             try
-                set inbox to mailbox "INBOX" of acc
+                set inbox to missing value
+                try
+                    set inbox to mailbox "INBOX" of acc
+                end try
+                if inbox is missing value then
+                    try
+                        set inbox to mailbox "Inbox" of acc
+                    end try
+                end if
+                if inbox is missing value then error "no inbox"
                 set foundMsgs to (messages of inbox whose subject contains query or sender contains query)
                 repeat with msg in foundMsgs
                     if (count of output) ≥ maxResults then exit repeat
