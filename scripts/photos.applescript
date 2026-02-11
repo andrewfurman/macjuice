@@ -4,7 +4,7 @@
 on run argv
     if (count of argv) < 1 then
         return "Usage: macjuice photos <command> [args...]
-Commands: recent [count], search <query>, albums, export <name> <folder>"
+Commands: recent [count], search <query>, albums, export <name> <folder>, import <file-path> [album]"
     end if
 
     set cmd to item 1 of argv
@@ -28,6 +28,16 @@ Commands: recent [count], search <query>, albums, export <name> <folder>"
             return exportByName(item 2 of argv, item 3 of argv)
         else
             return "Usage: macjuice photos export <name-or-keyword> <destination-folder>"
+        end if
+    else if cmd is "import" then
+        if (count of argv) > 1 then
+            if (count of argv) > 2 then
+                return importPhoto(item 2 of argv, item 3 of argv)
+            else
+                return importPhoto(item 2 of argv, "")
+            end if
+        else
+            return "Usage: macjuice photos import <file-path> [album-name]"
         end if
     else if cmd is "export-recent" then
         if (count of argv) > 2 then
@@ -156,6 +166,28 @@ on exportRecent(maxCount, destFolder)
         return "OK: Exported " & maxCount & " recent items to " & destFolder
     end tell
 end exportRecent
+
+-- Import a photo file into Apple Photos, optionally into a specific album
+on importPhoto(filePath, albumName)
+    set posixFile to POSIX file filePath
+    tell application "Photos"
+        if albumName is "" then
+            import {posixFile}
+            return "OK: Imported " & filePath & " into Apple Photos"
+        else
+            -- Find or create the album
+            set targetAlbum to missing value
+            try
+                set targetAlbum to album albumName
+            end try
+            if targetAlbum is missing value then
+                set targetAlbum to make new album named albumName
+            end if
+            import {posixFile} into targetAlbum
+            return "OK: Imported " & filePath & " into album '" & albumName & "'"
+        end if
+    end tell
+end importPhoto
 
 -- Helper: Join list with delimiter
 on joinList(theList, delimiter)
