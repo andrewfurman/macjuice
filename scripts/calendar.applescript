@@ -20,9 +20,20 @@ on run argv
         return upcomingEvents(days)
     else if cmd is "search" then
         if (count of argv) > 1 then
-            return searchEvents(item 2 of argv)
+            -- Parse optional --past=N and --future=N flags (days)
+            set pastDays to 90
+            set futureDays to 90
+            repeat with i from 2 to (count of argv)
+                set arg to item i of argv
+                if arg starts with "--past=" then
+                    set pastDays to (text 8 thru -1 of arg) as integer
+                else if arg starts with "--future=" then
+                    set futureDays to (text 10 thru -1 of arg) as integer
+                end if
+            end repeat
+            return searchEvents(item 2 of argv, pastDays, futureDays)
         else
-            return "Usage: calendar.applescript search <query>"
+            return "Usage: calendar.applescript search <query> [--past=days] [--future=days]"
         end if
     else if cmd is "create" then
         if (count of argv) > 3 then
@@ -181,7 +192,7 @@ on getEventsInRange(startDate, endDate)
 end getEventsInRange
 
 -- Search events by title
-on searchEvents(query)
+on searchEvents(query, pastDays, futureDays)
     set output to {}
     set maxResults to 20
 
@@ -195,14 +206,14 @@ on searchEvents(query)
         return "Error accessing Calendar app: " & errMsg
     end try
 
-    set searchStart to current date
-    set searchEnd to searchStart + (90 * 24 * 60 * 60)
+    set searchStart to (current date) - (pastDays * 24 * 60 * 60)
+    set searchEnd to (current date) + (futureDays * 24 * 60 * 60)
 
     repeat with cal in allCals
         if (count of output) ≥ maxResults then exit repeat
         try
             tell application "Calendar"
-                with timeout of 15 seconds
+                with timeout of 30 seconds
                     set calName to name of cal
                     set calEvents to (every event of cal whose summary contains query and start date ≥ searchStart and start date ≤ searchEnd)
                     repeat with evt in calEvents

@@ -157,11 +157,12 @@ def cmd_upcoming(conn, days):
         print(line)
 
 
-def cmd_search(conn, query):
-    """Search events by title (next 90 days)."""
+def cmd_search(conn, query, past_days=90, future_days=90):
+    """Search events by title within a date range."""
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    end = today + timedelta(days=90)
-    start_apple = to_apple(today)
+    start = today - timedelta(days=past_days)
+    end = today + timedelta(days=future_days)
+    start_apple = to_apple(start)
     end_apple = to_apple(end)
     pattern = f"%{query}%"
 
@@ -227,9 +228,16 @@ def main():
             cmd_upcoming(conn, days)
         elif cmd == "search":
             if len(sys.argv) < 3:
-                print("Usage: calendar_read.py search <query>", file=sys.stderr)
+                print("Usage: calendar_read.py search <query> [--past=days] [--future=days]", file=sys.stderr)
                 sys.exit(1)
-            cmd_search(conn, sys.argv[2])
+            past_days = 90
+            future_days = 90
+            for arg in sys.argv[3:]:
+                if arg.startswith("--past="):
+                    past_days = int(arg[7:])
+                elif arg.startswith("--future="):
+                    future_days = int(arg[9:])
+            cmd_search(conn, sys.argv[2], past_days, future_days)
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
             sys.exit(1)
