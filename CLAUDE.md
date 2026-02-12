@@ -49,8 +49,10 @@ The `--from=` flag controls which mail account is used, which determines which D
 ```bash
 macjuice calendar list                     # List all calendars
 macjuice calendar today                    # Today's events
-macjuice calendar week                     # This week's events
+macjuice calendar yesterday                # Yesterday's events
+macjuice calendar week                     # This week's events (next 7 days)
 macjuice calendar upcoming 14              # Next 14 days of events
+macjuice calendar past 7                   # Past 7 days of events
 macjuice calendar search "CoverNode"       # Search events by title
 macjuice calendar create "Meeting" "2026-02-01 10:00" "1h"           # Create event
 macjuice calendar create "Meeting" "2026-02-01 10:00" "30m" "Work"   # Create in specific calendar

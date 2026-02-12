@@ -128,8 +128,10 @@ show_app_help() {
             echo "Commands:"
             echo "  list                  List all calendars"
             echo "  today                 Show today's events"
-            echo "  week                  Show this week's events"
+            echo "  yesterday             Show yesterday's events"
+            echo "  week                  Show this week's events (next 7 days)"
             echo "  upcoming [days]       Show upcoming events (default: 7 days)"
+            echo "  past [days]           Show past events (default: 7 days)"
             echo "  search <query>        Search events"
             echo "  create <title> <date> <duration> [calendar]"
             echo "                        Create an event"
@@ -406,7 +408,7 @@ main() {
             ;;
         calendar)
             case "$cmd" in
-                list|today|week|upcoming|search)
+                list|today|yesterday|week|upcoming|past|search)
                     python3 "$SCRIPTS_DIR/calendar_read.py" "$cmd" "$@"
                     ;;
                 *)

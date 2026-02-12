@@ -157,6 +157,31 @@ def cmd_upcoming(conn, days):
         print(line)
 
 
+def cmd_past(conn, days):
+    """Show events from the past N days."""
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    start = today - timedelta(days=days)
+    end = today + timedelta(days=1)  # include today
+    lines = events_in_range(conn, start, end)
+    if not lines:
+        print(f"No events in the past {days} days")
+        return
+    for line in lines:
+        print(line)
+
+
+def cmd_yesterday(conn):
+    """Show yesterday's events."""
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday = today - timedelta(days=1)
+    lines = events_in_range(conn, yesterday, today)
+    if not lines:
+        print("No events yesterday")
+        return
+    for line in lines:
+        print(line)
+
+
 def cmd_search(conn, query, past_days=90, future_days=90):
     """Search events by title within a date range."""
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -203,7 +228,7 @@ def cmd_search(conn, query, past_days=90, future_days=90):
 def main():
     if len(sys.argv) < 2:
         print("Usage: calendar_read.py <command> [args...]", file=sys.stderr)
-        print("Commands: list, today, week, upcoming [days], search <query>",
+        print("Commands: list, today, yesterday, week, upcoming [days], past [days], search <query>",
               file=sys.stderr)
         sys.exit(1)
 
@@ -226,6 +251,17 @@ def main():
                     print("Error: days must be a number", file=sys.stderr)
                     sys.exit(1)
             cmd_upcoming(conn, days)
+        elif cmd == "past":
+            days = 7
+            if len(sys.argv) > 2:
+                try:
+                    days = int(sys.argv[2])
+                except ValueError:
+                    print("Error: days must be a number", file=sys.stderr)
+                    sys.exit(1)
+            cmd_past(conn, days)
+        elif cmd == "yesterday":
+            cmd_yesterday(conn)
         elif cmd == "search":
             if len(sys.argv) < 3:
                 print("Usage: calendar_read.py search <query> [--past=days] [--future=days]", file=sys.stderr)
