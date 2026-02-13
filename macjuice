@@ -97,6 +97,8 @@ show_app_help() {
             echo "  search <query>        Search emails (searches INBOX + Sent across all accounts)"
             echo "    --account <emails>  Filter to specific accounts (comma-separated)"
             echo "  read <message-id>     Read a specific email"
+            echo "  attachments <id>      List attachments on a message"
+            echo "  save-attachments <id> <dir>  Save attachments to a directory"
             echo "  send <to> <subj> <body>  Send an email"
             echo "  draft <to> <subj> <body> Save a draft email"
             echo "  delete-draft <id>     Delete a draft by message ID"
@@ -305,6 +307,25 @@ main() {
                         esac
                     done
                     run_applescript "mail" "search" "$query" "$account_filter"
+                    ;;
+                attachments)
+                    # List attachments on a message
+                    if [[ $# -lt 1 ]]; then
+                        echo -e "${RED}Error:${NC} attachments requires a message ID"
+                        echo "Usage: macjuice mail attachments <message-id>"
+                        exit 1
+                    fi
+                    run_applescript "mail" "attachments" "$1"
+                    ;;
+                save-attachments)
+                    # Save all attachments from a message to a directory
+                    # Uses Python helper (AppleScript can't save individual attachments)
+                    if [[ $# -lt 2 ]]; then
+                        echo -e "${RED}Error:${NC} save-attachments requires a message ID and save directory"
+                        echo "Usage: macjuice mail save-attachments <message-id> <save-directory>"
+                        exit 1
+                    fi
+                    python3 "$SCRIPTS_DIR/mail_save_attachments.py" "$1" "$2"
                     ;;
                 draft)
                     # Parse: macjuice mail draft <to> <subject> <body> [--account <name>] [--cc <cc>] [--bcc <bcc>] [--reply-to <id>]

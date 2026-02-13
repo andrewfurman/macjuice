@@ -77,6 +77,12 @@ on run argv
         else
             return "Usage: mail.applescript reply <message-id> <body> [--from=email] [--cc=emails] [--bcc=emails]"
         end if
+    else if cmd is "attachments" then
+        if (count of argv) > 1 then
+            return listAttachments(item 2 of argv)
+        else
+            return "Usage: mail.applescript attachments <message-id>"
+        end if
     else if cmd is "delete-draft" then
         if (count of argv) > 1 then
             return deleteDraft(item 2 of argv)
@@ -332,6 +338,34 @@ on sendMessage(toAddr, subjectText, bodyText, senderAddr, attachmentPaths)
         end if
     end tell
 end sendMessage
+
+-- List attachments on a message (uses index-based access to avoid AppleEvent reference bug)
+on listAttachments(messageId)
+    tell application "Mail"
+        repeat with acc in accounts
+            repeat with mb in mailboxes of acc
+                try
+                    set msg to (first message of mb whose id is messageId)
+                    set attList to mail attachments of msg
+                    set attCount to count of attList
+                    if attCount is 0 then
+                        return "No attachments on message: " & messageId
+                    end if
+                    set output to {}
+                    repeat with idx from 1 to attCount
+                        set att to item idx of attList
+                        set attName to name of att
+                        set attSize to file size of att
+                        set attLine to (idx as text) & " | " & attName & " | " & (attSize as text) & " bytes"
+                        set end of output to attLine
+                    end repeat
+                    return my joinList(output, linefeed)
+                end try
+            end repeat
+        end repeat
+        return "Message not found: " & messageId
+    end tell
+end listAttachments
 
 -- Delete a draft message by ID
 on deleteDraft(messageId)
