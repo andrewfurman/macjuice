@@ -318,9 +318,15 @@ main() {
                     local account="" cc="" bcc="" reply_to=""
                     while [[ $# -gt 0 ]]; do
                         case "$1" in
+                            --account=*) account="${1#--account=}"; shift ;;
                             --account) account="$2"; shift 2 ;;
+                            --from=*)  account="${1#--from=}"; shift ;;
+                            --from)    account="$2"; shift 2 ;;
+                            --cc=*)    cc="${1#--cc=}"; shift ;;
                             --cc)      cc="$2"; shift 2 ;;
+                            --bcc=*)   bcc="${1#--bcc=}"; shift ;;
                             --bcc)     bcc="$2"; shift 2 ;;
+                            --reply-to=*) reply_to="${1#--reply-to=}"; shift ;;
                             --reply-to) reply_to="$2"; shift 2 ;;
                             *)         shift ;;
                         esac
