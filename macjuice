@@ -94,7 +94,8 @@ show_app_help() {
             echo "Commands:"
             echo "  accounts              List all mail accounts"
             echo "  list [mailbox]        List recent emails (default: INBOX)"
-            echo "  search <query>        Search emails"
+            echo "  search <query>        Search emails (searches INBOX + Sent across all accounts)"
+            echo "    --account <emails>  Filter to specific accounts (comma-separated)"
             echo "  read <message-id>     Read a specific email"
             echo "  send <to> <subj> <body>  Send an email"
             echo "  draft <to> <subj> <body> Save a draft email"
@@ -286,6 +287,25 @@ main() {
             ;;
         mail)
             case "$cmd" in
+                search)
+                    # Parse: macjuice mail search <query> [--account <emails>]
+                    # --account accepts comma-separated email addresses to filter by specific accounts
+                    if [[ $# -lt 1 ]]; then
+                        echo -e "${RED}Error:${NC} search requires a query"
+                        echo "Usage: macjuice mail search <query> [--account <email1,email2,...>]"
+                        exit 1
+                    fi
+                    local query="$1"
+                    shift
+                    local account_filter=""
+                    while [[ $# -gt 0 ]]; do
+                        case "$1" in
+                            --account) account_filter="$2"; shift 2 ;;
+                            *)         shift ;;
+                        esac
+                    done
+                    run_applescript "mail" "search" "$query" "$account_filter"
+                    ;;
                 draft)
                     # Parse: macjuice mail draft <to> <subject> <body> [--account <name>] [--cc <cc>] [--bcc <bcc>] [--reply-to <id>]
                     if [[ $# -lt 3 ]]; then

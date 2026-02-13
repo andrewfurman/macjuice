@@ -17,10 +17,12 @@ on run argv
             return listMessages("INBOX")
         end if
     else if cmd is "search" then
-        if (count of argv) > 1 then
-            return searchMessages(item 2 of argv)
+        if (count of argv) > 2 then
+            return searchMessages(item 2 of argv, item 3 of argv)
+        else if (count of argv) > 1 then
+            return searchMessages(item 2 of argv, "")
         else
-            return "Usage: mail.applescript search <query>"
+            return "Usage: mail.applescript search <query> [account-emails]"
         end if
     else if cmd is "read" then
         if (count of argv) > 1 then
@@ -144,29 +146,51 @@ on listMessages(mailboxName)
     return my joinList(output, linefeed)
 end listMessages
 
--- Search messages
-on searchMessages(query)
+-- Search messages (optionally filtered to specific accounts by comma-separated email addresses)
+on searchMessages(query, accountFilter)
     tell application "Mail"
         set output to {}
         set maxResults to 20
 
         repeat with acc in accounts
             try
-                set inbox to missing value
-                try
-                    set inbox to mailbox "INBOX" of acc
-                end try
-                if inbox is missing value then
-                    try
-                        set inbox to mailbox "Inbox" of acc
-                    end try
+                -- If account filter is provided, skip non-matching accounts
+                if accountFilter is not "" then
+                    set accEmails to email addresses of acc as text
+                    set matchFound to false
+                    -- Split comma-separated filter and check each
+                    set oldDelimiters to AppleScript's text item delimiters
+                    set AppleScript's text item delimiters to ","
+                    set filterParts to text items of accountFilter
+                    set AppleScript's text item delimiters to oldDelimiters
+                    repeat with filterPart in filterParts
+                        if accEmails contains (filterPart as text) then
+                            set matchFound to true
+                            exit repeat
+                        end if
+                    end repeat
+                    if not matchFound then error "skip account"
                 end if
-                if inbox is missing value then error "no inbox"
-                set foundMsgs to (messages of inbox whose subject contains query or sender contains query)
-                repeat with msg in foundMsgs
+
+                -- Try multiple common mailbox names to cover Exchange, IMAP, iCloud, etc.
+                set mailboxesToSearch to {}
+                repeat with mbName in {"INBOX", "Inbox", "Sent Messages", "Sent", "Archive", "All Mail"}
+                    try
+                        set mb to mailbox (mbName as text) of acc
+                        set end of mailboxesToSearch to mb
+                    end try
+                end repeat
+
+                repeat with mb in mailboxesToSearch
+                    try
+                        set foundMsgs to (messages of mb whose subject contains query or sender contains query)
+                        repeat with msg in foundMsgs
+                            if (count of output) ≥ maxResults then exit repeat
+                            set msgLine to (id of msg as text) & " | " & (date sent of msg as text) & " | " & (sender of msg) & " | " & (subject of msg)
+                            set end of output to msgLine
+                        end repeat
+                    end try
                     if (count of output) ≥ maxResults then exit repeat
-                    set msgLine to (id of msg as text) & " | " & (sender of msg) & " | " & (subject of msg)
-                    set end of output to msgLine
                 end repeat
             end try
         end repeat
