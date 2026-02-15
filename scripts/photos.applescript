@@ -133,8 +133,10 @@ on exportByName(query, destFolder)
         set allItems to media items
         set matchedItems to {}
         set queryLower to my toLowerCase(query)
+        set maxExport to 50
 
         repeat with item_ in allItems
+            if (count of matchedItems) ≥ maxExport then exit repeat
             set itemName to filename of item_
             set itemDesc to ""
             try
@@ -144,7 +146,7 @@ on exportByName(query, destFolder)
             set nameLower to my toLowerCase(itemName)
             set descLower to my toLowerCase(itemDesc)
             if nameLower contains queryLower or descLower contains queryLower then
-                set end of matchedItems to item_
+                set end of matchedItems to (contents of item_)
             end if
         end repeat
 

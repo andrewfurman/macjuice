@@ -448,6 +448,15 @@ main() {
                     fi
                     python3 "$SCRIPTS_DIR/photos_search.py" "$@"
                     ;;
+                export)
+                    # SQLite search + targeted AppleScript export (handles large libraries)
+                    if [[ $# -lt 2 ]]; then
+                        echo -e "${RED}Error:${NC} export requires a query and destination folder"
+                        echo "Usage: macjuice photos export <query> <destination-folder>"
+                        exit 1
+                    fi
+                    python3 "$SCRIPTS_DIR/photos_export.py" "$@"
+                    ;;
                 *)
                     run_applescript "photos" "$cmd" "$@"
                     ;;
