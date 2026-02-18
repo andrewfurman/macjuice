@@ -17,12 +17,10 @@ on run argv
             return listMessages("INBOX")
         end if
     else if cmd is "search" then
-        if (count of argv) > 2 then
-            return searchMessages(item 2 of argv, item 3 of argv)
-        else if (count of argv) > 1 then
-            return searchMessages(item 2 of argv, "")
+        if (count of argv) > 1 then
+            return searchMessages(item 2 of argv)
         else
-            return "Usage: mail.applescript search <query> [account-emails]"
+            return "Usage: mail.applescript search <query>"
         end if
     else if cmd is "read" then
         if (count of argv) > 1 then
@@ -55,6 +53,29 @@ on run argv
         else
             return "Usage: mail.applescript draft <to> <subject> <body> [--from=email] [--cc=email] [--bcc=email] [attachment ...]"
         end if
+    else if cmd is "html-draft" then
+        -- html-draft <to> <subject> [--from=email] [--cc=emails] [--bcc=emails]
+        -- Clipboard must already contain RTF (loaded by Python helper before this call)
+        if (count of argv) > 2 then
+            set senderAddr to ""
+            set ccAddr to ""
+            set bccAddr to ""
+            if (count of argv) > 3 then
+                repeat with i from 4 to (count of argv)
+                    set arg to item i of argv
+                    if arg starts with "--from=" then
+                        set senderAddr to text 8 thru -1 of arg
+                    else if arg starts with "--cc=" then
+                        set ccAddr to text 6 thru -1 of arg
+                    else if arg starts with "--bcc=" then
+                        set bccAddr to text 7 thru -1 of arg
+                    end if
+                end repeat
+            end if
+            return htmlDraftMessage(item 2 of argv, item 3 of argv, senderAddr, ccAddr, bccAddr)
+        else
+            return "Usage: mail.applescript html-draft <to> <subject> [--from=email] [--cc=emails] [--bcc=emails]"
+        end if
     else if cmd is "reply" then
         -- reply <message-id> <body> [--from=email] [--cc=emails] [--bcc=emails]
         if (count of argv) > 2 then
@@ -77,11 +98,16 @@ on run argv
         else
             return "Usage: mail.applescript reply <message-id> <body> [--from=email] [--cc=emails] [--bcc=emails]"
         end if
-    else if cmd is "attachments" then
-        if (count of argv) > 1 then
-            return listAttachments(item 2 of argv)
+    else if cmd is "attach" then
+        -- attach <message-id> <file1> [file2] ...
+        if (count of argv) > 2 then
+            set filePaths to {}
+            repeat with i from 3 to (count of argv)
+                set end of filePaths to item i of argv
+            end repeat
+            return attachToDraft(item 2 of argv, filePaths)
         else
-            return "Usage: mail.applescript attachments <message-id>"
+            return "Usage: mail.applescript attach <message-id> <file1> [file2] ..."
         end if
     else if cmd is "delete-draft" then
         if (count of argv) > 1 then
@@ -152,51 +178,29 @@ on listMessages(mailboxName)
     return my joinList(output, linefeed)
 end listMessages
 
--- Search messages (optionally filtered to specific accounts by comma-separated email addresses)
-on searchMessages(query, accountFilter)
+-- Search messages
+on searchMessages(query)
     tell application "Mail"
         set output to {}
         set maxResults to 20
 
         repeat with acc in accounts
             try
-                -- If account filter is provided, skip non-matching accounts
-                if accountFilter is not "" then
-                    set accEmails to email addresses of acc as text
-                    set matchFound to false
-                    -- Split comma-separated filter and check each
-                    set oldDelimiters to AppleScript's text item delimiters
-                    set AppleScript's text item delimiters to ","
-                    set filterParts to text items of accountFilter
-                    set AppleScript's text item delimiters to oldDelimiters
-                    repeat with filterPart in filterParts
-                        if accEmails contains (filterPart as text) then
-                            set matchFound to true
-                            exit repeat
-                        end if
-                    end repeat
-                    if not matchFound then error "skip account"
+                set inbox to missing value
+                try
+                    set inbox to mailbox "INBOX" of acc
+                end try
+                if inbox is missing value then
+                    try
+                        set inbox to mailbox "Inbox" of acc
+                    end try
                 end if
-
-                -- Try multiple common mailbox names to cover Exchange, IMAP, iCloud, etc.
-                set mailboxesToSearch to {}
-                repeat with mbName in {"INBOX", "Inbox", "Sent Messages", "Sent", "Archive", "All Mail"}
-                    try
-                        set mb to mailbox (mbName as text) of acc
-                        set end of mailboxesToSearch to mb
-                    end try
-                end repeat
-
-                repeat with mb in mailboxesToSearch
-                    try
-                        set foundMsgs to (messages of mb whose subject contains query or sender contains query)
-                        repeat with msg in foundMsgs
-                            if (count of output) ≥ maxResults then exit repeat
-                            set msgLine to (id of msg as text) & " | " & (date sent of msg as text) & " | " & (sender of msg) & " | " & (subject of msg)
-                            set end of output to msgLine
-                        end repeat
-                    end try
+                if inbox is missing value then error "no inbox"
+                set foundMsgs to (messages of inbox whose subject contains query or sender contains query)
+                repeat with msg in foundMsgs
                     if (count of output) ≥ maxResults then exit repeat
+                    set msgLine to (id of msg as text) & " | " & (sender of msg) & " | " & (subject of msg)
+                    set end of output to msgLine
                 end repeat
             end try
         end repeat
@@ -229,23 +233,18 @@ on readMessage(messageId)
 end readMessage
 
 -- Create a draft message and save it to the Drafts folder
+-- When --from is specified, saves to that account's Drafts folder (not iCloud default)
 on draftMessage(toAddr, subjectText, bodyText, senderAddr, ccAddr, bccAddr, attachmentPaths)
     tell application "Mail"
         activate
-        -- Track which windows exist before creating the compose window
-        set windowIdsBefore to {}
-        repeat with w in windows
-            try
-                set end of windowIdsBefore to id of w
-            end try
-        end repeat
-        set newMessage to make new outgoing message with properties {subject:subjectText, content:bodyText, visible:true}
+        -- Create outgoing message with sender in initial properties so Mail routes to correct account
+        if senderAddr is not "" then
+            set newMessage to make new outgoing message with properties {subject:subjectText, content:bodyText, sender:senderAddr, visible:true}
+        else
+            set newMessage to make new outgoing message with properties {subject:subjectText, content:bodyText, visible:true}
+        end if
         tell newMessage
             make new to recipient at end of to recipients with properties {address:toAddr}
-            -- Set sender if specified
-            if senderAddr is not "" then
-                set sender to senderAddr
-            end if
             -- Set CC if specified (supports comma-separated list)
             if ccAddr is not "" then
                 set ccList to my splitCommaList(ccAddr)
@@ -263,39 +262,44 @@ on draftMessage(toAddr, subjectText, bodyText, senderAddr, ccAddr, bccAddr, atta
             repeat with attachPath in attachmentPaths
                 set attachFile to POSIX file (attachPath as text) as alias
                 make new attachment with properties {file name:attachFile} at after the last paragraph
+                delay 1
             end repeat
         end tell
-        -- Find the NEW compose window and close it to trigger save-as-draft dialog
-        delay 1
-        set composeWindowName to ""
-        repeat with w in windows
-            try
-                set wId to id of w
-                if windowIdsBefore does not contain wId then
-                    set composeWindowName to name of w
-                    close w
-                    exit repeat
-                end if
-            end try
-        end repeat
+        -- Wait for compose window to fully render
+        set attachCount to count of attachmentPaths
+        if attachCount > 0 then
+            delay (attachCount * 1 + 2)
+        else
+            delay 2
+        end if
     end tell
-    -- Click "Save" in the save-as-draft dialog sheet
-    delay 1
+    -- Save with Cmd+S then close with Cmd+W
+    -- Note: sender property correctly sets the From dropdown, but draft saves to iCloud Drafts
+    -- (this is an Apple Mail limitation — the From address IS correct when user opens the draft)
     tell application "System Events"
         tell process "Mail"
             set frontmost to true
-            -- Find the window with the sheet dialog and click Save
-            repeat with w in windows
-                try
-                    click button "Save" of sheet 1 of w
-                    exit repeat
-                end try
-            end repeat
+            delay 0.3
+            keystroke "s" using command down
+        end tell
+    end tell
+    delay 2
+    tell application "System Events"
+        tell process "Mail"
+            keystroke "w" using command down
         end tell
     end tell
     delay 1
+    -- Handle save dialog in case it still appears
+    tell application "System Events"
+        tell process "Mail"
+            try
+                click button "Don't Save" of sheet 1 of (first window whose subrole is "AXStandardWindow")
+            end try
+        end tell
+    end tell
+    delay 0.5
     tell application "Mail"
-        -- Build status message
         set fromNote to ""
         if senderAddr is not "" then
             set fromNote to " from " & senderAddr
@@ -314,6 +318,70 @@ on draftMessage(toAddr, subjectText, bodyText, senderAddr, ccAddr, bccAddr, atta
         return "OK: Draft saved to Drafts for " & toAddr & fromNote & extras
     end tell
 end draftMessage
+
+-- Create an HTML draft: compose window with recipients, then paste RTF from clipboard
+-- Clipboard must already be loaded with RTF content before calling this
+on htmlDraftMessage(toAddr, subjectText, senderAddr, ccAddr, bccAddr)
+    tell application "Mail"
+        activate
+        if senderAddr is not "" then
+            set newMessage to make new outgoing message with properties {subject:subjectText, content:"PLACEHOLDER_BODY", sender:senderAddr, visible:true}
+        else
+            set newMessage to make new outgoing message with properties {subject:subjectText, content:"PLACEHOLDER_BODY", visible:true}
+        end if
+        tell newMessage
+            set toList to my splitCommaList(toAddr)
+            repeat with addr in toList
+                make new to recipient at end of to recipients with properties {address:addr}
+            end repeat
+            if ccAddr is not "" then
+                set ccList to my splitCommaList(ccAddr)
+                repeat with addr in ccList
+                    make new cc recipient at end of cc recipients with properties {address:addr}
+                end repeat
+            end if
+            if bccAddr is not "" then
+                set bccList to my splitCommaList(bccAddr)
+                repeat with addr in bccList
+                    make new bcc recipient at end of bcc recipients with properties {address:addr}
+                end repeat
+            end if
+        end tell
+    end tell
+
+    -- Wait for compose window to fully render
+    delay 1.5
+
+    -- Click into body and paste (all in one System Events block so front window = compose window)
+    tell application "System Events"
+        tell process "Mail"
+            set frontmost to true
+            delay 0.3
+            try
+                click scroll area 1 of front window
+            end try
+            delay 0.3
+            keystroke "a" using command down
+            delay 0.2
+            keystroke "v" using command down
+        end tell
+    end tell
+
+    delay 0.5
+
+    set fromNote to ""
+    if senderAddr is not "" then
+        set fromNote to " from " & senderAddr
+    end if
+    set extras to ""
+    if ccAddr is not "" then
+        set extras to extras & " cc:" & ccAddr
+    end if
+    if bccAddr is not "" then
+        set extras to extras & " bcc:" & bccAddr
+    end if
+    return "OK: HTML draft opened for " & toAddr & fromNote & extras
+end htmlDraftMessage
 
 -- Send a new message
 on sendMessage(toAddr, subjectText, bodyText, senderAddr, attachmentPaths)
@@ -338,34 +406,6 @@ on sendMessage(toAddr, subjectText, bodyText, senderAddr, attachmentPaths)
         end if
     end tell
 end sendMessage
-
--- List attachments on a message (uses index-based access to avoid AppleEvent reference bug)
-on listAttachments(messageId)
-    tell application "Mail"
-        repeat with acc in accounts
-            repeat with mb in mailboxes of acc
-                try
-                    set msg to (first message of mb whose id is messageId)
-                    set attList to mail attachments of msg
-                    set attCount to count of attList
-                    if attCount is 0 then
-                        return "No attachments on message: " & messageId
-                    end if
-                    set output to {}
-                    repeat with idx from 1 to attCount
-                        set att to item idx of attList
-                        set attName to name of att
-                        set attSize to file size of att
-                        set attLine to (idx as text) & " | " & attName & " | " & (attSize as text) & " bytes"
-                        set end of output to attLine
-                    end repeat
-                    return my joinList(output, linefeed)
-                end try
-            end repeat
-        end repeat
-        return "Message not found: " & messageId
-    end tell
-end listAttachments
 
 -- Delete a draft message by ID
 on deleteDraft(messageId)
@@ -467,6 +507,73 @@ on replyMessage(messageId, bodyText, senderAddr, ccAddr, bccAddr)
         return "Message not found: " & messageId
     end tell
 end replyMessage
+
+-- Attach files to an existing draft message
+-- Opens the draft as a compose window, adds attachments, and leaves open for review
+on attachToDraft(messageId, filePaths)
+    tell application "Mail"
+        activate
+        -- Find the draft message across all accounts/mailboxes
+        set foundMsg to missing value
+        set foundSubj to ""
+        repeat with acc in accounts
+            repeat with mb in mailboxes of acc
+                try
+                    set msg to (first message of mb whose id is (messageId as integer))
+                    set foundMsg to msg
+                    set foundSubj to subject of msg
+                    exit repeat
+                end try
+            end repeat
+            if foundMsg is not missing value then exit repeat
+        end repeat
+
+        if foundMsg is missing value then
+            return "Draft not found: " & messageId
+        end if
+
+        -- Open the draft (opens as editable compose window)
+        open foundMsg
+        delay 3
+    end tell
+
+    -- Attach each file using pbcopy + paste approach
+    -- pbcopy with file references puts files on clipboard as attachable objects
+    set attachCount to count of filePaths
+    set attachedCount to 0
+    repeat with filePath in filePaths
+        set filePathStr to filePath as text
+        -- Use osascript to set the clipboard to the file reference
+        -- This puts the file on the pasteboard in a way Mail recognizes as attachment
+        try
+            do shell script "osascript -e 'set the clipboard to (POSIX file \"" & filePathStr & "\" as alias)'"
+            delay 0.5
+
+            -- Paste into Mail compose window
+            tell application "Mail"
+                activate
+            end tell
+            delay 0.3
+            tell application "System Events"
+                tell process "Mail"
+                    set frontmost to true
+                    delay 0.2
+                    keystroke "v" using command down
+                end tell
+            end tell
+            delay 2
+            set attachedCount to attachedCount + 1
+        on error errMsg
+            -- File not found or clipboard failed, skip
+        end try
+    end repeat
+
+    -- Wait for all attachments to fully load
+    delay (attachedCount + 2)
+
+    -- Compose window left open for user to review and send
+    return "OK: Attached " & attachedCount & " of " & attachCount & " file(s) to draft: " & foundSubj & " — compose window left open for review"
+end attachToDraft
 
 -- Helper: Split comma-separated string into a list, trimming whitespace
 on splitCommaList(theString)

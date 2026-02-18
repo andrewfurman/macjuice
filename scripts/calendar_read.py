@@ -43,7 +43,7 @@ def format_duration(start_dt, end_dt):
     return f"{mins}m"
 
 
-def format_event(summary, start_dt, end_dt, cal_name, loc_name, all_day):
+def format_event(summary, start_dt, end_dt, cal_name, loc_name, all_day, attendees=None):
     """Format one event line matching the AppleScript output style."""
     if all_day:
         date_str = start_dt.strftime("%m/%d/%Y") + " all-day"
@@ -60,7 +60,12 @@ def format_event(summary, start_dt, end_dt, cal_name, loc_name, all_day):
     if loc_name:
         loc = f" @ {loc_name}"
 
-    return f"{date_str} | {summary}{dur}{loc} [{cal_name}]"
+    line = f"{date_str} | {summary}{dur}{loc} [{cal_name}]"
+
+    if attendees:
+        line += f"\n    Attendees: {', '.join(attendees)}"
+
+    return line
 
 
 def get_connection():
@@ -72,10 +77,39 @@ def get_connection():
     return conn
 
 
+def get_attendees_for_events(conn, start_dt, end_dt):
+    """Get attendees for events in date range, grouped by CalendarItem ROWID."""
+    start_apple = to_apple(start_dt)
+    end_apple = to_apple(end_dt)
+
+    sql = """
+        SELECT ci.ROWID, COALESCE(i.display_name, p.email, 'Unknown') AS name
+        FROM Participant p
+        JOIN CalendarItem ci ON p.owner_id = ci.ROWID
+        JOIN OccurrenceCache oc ON oc.event_id = ci.ROWID
+        LEFT JOIN Identity i ON p.identity_id = i.ROWID
+        WHERE oc.day >= ? AND oc.day < ?
+        ORDER BY ci.ROWID, p.ROWID
+    """
+    rows = conn.execute(sql, (start_apple, end_apple)).fetchall()
+
+    attendee_map = {}
+    for rowid, name in rows:
+        if rowid not in attendee_map:
+            attendee_map[rowid] = []
+        # Deduplicate
+        if name not in attendee_map[rowid]:
+            attendee_map[rowid].append(name)
+    return attendee_map
+
+
 def events_in_range(conn, start_dt, end_dt):
     """Query OccurrenceCache for events in [start_dt, end_dt)."""
     start_apple = to_apple(start_dt)
     end_apple = to_apple(end_dt)
+
+    # Fetch attendees for all events in range
+    attendee_map = get_attendees_for_events(conn, start_dt, end_dt)
 
     sql = """
         SELECT ci.summary,
@@ -84,7 +118,8 @@ def events_in_range(conn, start_dt, end_dt):
                oc.occurrence_end_date,
                c.title AS cal_name,
                l.title AS loc_name,
-               ci.all_day
+               ci.all_day,
+               ci.ROWID AS item_id
         FROM OccurrenceCache oc
         JOIN CalendarItem ci ON oc.event_id = ci.ROWID
         JOIN Calendar c ON oc.calendar_id = c.ROWID
@@ -95,7 +130,7 @@ def events_in_range(conn, start_dt, end_dt):
     rows = conn.execute(sql, (start_apple, end_apple)).fetchall()
 
     lines = []
-    for summary, occ_date, occ_start, occ_end, cal_name, loc_name, all_day in rows:
+    for summary, occ_date, occ_start, occ_end, cal_name, loc_name, all_day, item_id in rows:
         # occurrence_start_date may be NULL; fall back to occurrence_date
         start_ts = occ_start if occ_start is not None else occ_date
         end_ts = occ_end
@@ -105,8 +140,10 @@ def events_in_range(conn, start_dt, end_dt):
         if start is None:
             continue
 
+        attendees = attendee_map.get(item_id)
         lines.append(format_event(summary or "(No title)", start, end,
-                                  cal_name or "Unknown", loc_name, bool(all_day)))
+                                  cal_name or "Unknown", loc_name, bool(all_day),
+                                  attendees))
     return lines
 
 

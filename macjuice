@@ -101,6 +101,7 @@ show_app_help() {
             echo "  save-attachments <id> <dir>  Save attachments to a directory"
             echo "  send <to> <subj> <body>  Send an email"
             echo "  draft <to> <subj> <body> Save a draft email"
+            echo "  html-draft <to> <subj> <html-file> Open a rich HTML email draft"
             echo "  delete-draft <id>     Delete a draft by message ID"
             echo "  reply <id> <body>     Reply to a message (saves as draft)"
             echo ""
@@ -359,6 +360,105 @@ main() {
                     [[ -n "$cc" ]] && as_args+=("--cc=$cc")
                     [[ -n "$bcc" ]] && as_args+=("--bcc=$bcc")
                     run_applescript "mail" "draft" "${as_args[@]}"
+                    ;;
+                html-draft)
+                    # Parse: macjuice mail html-draft <to> <subject> <html-file-or-string> [--account <name>] [--cc <cc>] [--bcc <bcc>]
+                    if [[ $# -lt 3 ]]; then
+                        echo -e "${RED}Error:${NC} html-draft requires <to> <subject> <html-file-or-string>"
+                        echo "Usage: macjuice mail html-draft <to> <subject> <html-file-or-string> [--account <name>] [--cc <cc>] [--bcc <bcc>]"
+                        exit 1
+                    fi
+                    local to_addr="$1" subject="$2" html_body="$3"
+                    shift 3
+                    local account="" cc="" bcc=""
+                    while [[ $# -gt 0 ]]; do
+                        case "$1" in
+                            --account=*) account="${1#--account=}"; shift ;;
+                            --account) account="$2"; shift 2 ;;
+                            --from=*)  account="${1#--from=}"; shift ;;
+                            --from)    account="$2"; shift 2 ;;
+                            --cc=*)    cc="${1#--cc=}"; shift ;;
+                            --cc)      cc="$2"; shift 2 ;;
+                            --bcc=*)   bcc="${1#--bcc=}"; shift ;;
+                            --bcc)     bcc="$2"; shift 2 ;;
+                            *)         shift ;;
+                        esac
+                    done
+
+                    # Step 1: Load HTML onto clipboard as RTF
+                    python3 "$SCRIPTS_DIR/mail_html_clipboard.py" "$html_body"
+                    if [[ $? -ne 0 ]]; then
+                        echo -e "${RED}Error:${NC} Failed to load HTML to clipboard"
+                        exit 1
+                    fi
+
+                    # Step 2: Build recipient AppleScript blocks
+                    local to_block=""
+                    IFS=',' read -ra TO_ADDRS <<< "$to_addr"
+                    for addr in "${TO_ADDRS[@]}"; do
+                        to_block+="make new to recipient at end of to recipients with properties {address:\"$addr\"}"$'\n'
+                    done
+
+                    local cc_block=""
+                    if [[ -n "$cc" ]]; then
+                        IFS=',' read -ra CC_ADDRS <<< "$cc"
+                        for addr in "${CC_ADDRS[@]}"; do
+                            cc_block+="make new cc recipient at end of cc recipients with properties {address:\"$addr\"}"$'\n'
+                        done
+                    fi
+
+                    local bcc_block=""
+                    if [[ -n "$bcc" ]]; then
+                        IFS=',' read -ra BCC_ADDRS <<< "$bcc"
+                        for addr in "${BCC_ADDRS[@]}"; do
+                            bcc_block+="make new bcc recipient at end of bcc recipients with properties {address:\"$addr\"}"$'\n'
+                        done
+                    fi
+
+                    local sender_prop=""
+                    if [[ -n "$account" ]]; then
+                        sender_prop=", sender:\"$account\""
+                    fi
+
+                    # Step 3: Create compose window with recipients
+                    # NOTE: Mail's compose body uses a WKWebView which cannot receive
+                    # programmatic keystrokes. The HTML content is loaded onto the
+                    # clipboard as RTF - the user needs to click the body and Cmd+V.
+                    osascript <<ENDSCRIPT || true
+tell application "Mail"
+    set windowCount to count of windows
+    repeat with i from windowCount to 1 by -1
+        try
+            set w to window i
+            if name of w contains "$subject" then
+                close w saving no
+            end if
+        end try
+    end repeat
+end tell
+
+delay 0.3
+
+tell application "Mail"
+    set newMessage to make new outgoing message with properties {subject:"$subject", content:""${sender_prop}, visible:true}
+    tell newMessage
+        $to_block
+        $cc_block
+        $bcc_block
+    end tell
+    activate
+end tell
+
+return "Done"
+ENDSCRIPT
+
+                    echo -e "${GREEN}OK:${NC} HTML draft opened for $to_addr"
+                    [[ -n "$account" ]] && echo -e "  From: $account" || true
+                    [[ -n "$cc" ]] && echo -e "  CC: $cc" || true
+                    [[ -n "$bcc" ]] && echo -e "  BCC: $bcc" || true
+                    echo ""
+                    echo -e "${YELLOW}HTML content is on your clipboard.${NC}"
+                    echo -e "Click the email body, then press ${CYAN}Cmd+V${NC} to paste."
                     ;;
                 reply)
                     # Parse: macjuice mail reply <message-id-or-search> <body> [--from=email] [--cc=emails] [--bcc=emails]
