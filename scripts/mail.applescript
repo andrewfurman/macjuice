@@ -18,7 +18,9 @@ on run argv
         end if
     else if cmd is "search" then
         if (count of argv) > 1 then
-            return searchMessages(item 2 of argv)
+            set accountFilter to ""
+            if (count of argv) > 2 then set accountFilter to item 3 of argv
+            return searchMessages(item 2 of argv, accountFilter)
         else
             return "Usage: mail.applescript search <query>"
         end if
@@ -97,6 +99,34 @@ on run argv
             return replyMessage(item 2 of argv, item 3 of argv, senderAddr, ccAddr, bccAddr)
         else
             return "Usage: mail.applescript reply <message-id> <body> [--from=email] [--cc=emails] [--bcc=emails]"
+        end if
+    else if cmd is "forward" then
+        -- forward <message-id> <to> [--from=email] [--cc=emails] [--bcc=emails] [--body=text] [attachment ...]
+        if (count of argv) > 2 then
+            set senderAddr to ""
+            set ccAddr to ""
+            set bccAddr to ""
+            set bodyText to ""
+            set attachments to {}
+            if (count of argv) > 3 then
+                repeat with i from 4 to (count of argv)
+                    set arg to item i of argv
+                    if arg starts with "--from=" then
+                        set senderAddr to text 8 thru -1 of arg
+                    else if arg starts with "--cc=" then
+                        set ccAddr to text 6 thru -1 of arg
+                    else if arg starts with "--bcc=" then
+                        set bccAddr to text 7 thru -1 of arg
+                    else if arg starts with "--body=" then
+                        set bodyText to text 8 thru -1 of arg
+                    else
+                        set end of attachments to arg
+                    end if
+                end repeat
+            end if
+            return forwardMessage(item 2 of argv, item 3 of argv, bodyText, senderAddr, ccAddr, bccAddr, attachments)
+        else
+            return "Usage: mail.applescript forward <message-id> <to> [--from=email] [--cc=emails] [--bcc=emails] [--body=text] [attachment ...]"
         end if
     else if cmd is "attach" then
         -- attach <message-id> <file1> [file2] ...
@@ -184,37 +214,187 @@ on listMessages(mailboxName)
     return my joinList(output, linefeed)
 end listMessages
 
--- Search messages
-on searchMessages(query)
+-- Helper: Check if an account matches the filter string (email or account name)
+on accountMatchesFilter(acc, filterStr)
+    if filterStr is "" then return true
     tell application "Mail"
-        set output to {}
-        set maxResults to 20
-
-        repeat with acc in accounts
-            try
-                set inbox to missing value
-                try
-                    set inbox to mailbox "INBOX" of acc
-                end try
-                if inbox is missing value then
-                    try
-                        set inbox to mailbox "Inbox" of acc
-                    end try
-                end if
-                if inbox is missing value then error "no inbox"
-                set foundMsgs to (messages of inbox whose subject contains query or sender contains query)
-                repeat with msg in foundMsgs
-                    if (count of output) ≥ maxResults then exit repeat
-                    set msgLine to (id of msg as text) & " | " & (sender of msg) & " | " & (subject of msg)
-                    set end of output to msgLine
-                end repeat
-            end try
-        end repeat
-
-        if (count of output) is 0 then
-            return "No messages found matching: " & query
-        end if
+        set accName to name of acc
+        set accEmails to email addresses of acc
     end tell
+    set oldDelimiters to AppleScript's text item delimiters
+    set AppleScript's text item delimiters to ","
+    set filterItems to text items of filterStr
+    set AppleScript's text item delimiters to oldDelimiters
+    repeat with f in filterItems
+        set f to f as text
+        repeat while f starts with " "
+            if (count of f) > 1 then
+                set f to text 2 thru -1 of f
+            else
+                set f to ""
+            end if
+        end repeat
+        repeat while f ends with " "
+            if (count of f) > 1 then
+                set f to text 1 thru -2 of f
+            else
+                set f to ""
+            end if
+        end repeat
+        if f is not "" then
+            if accName contains f then return true
+            repeat with e in accEmails
+                if (e as text) contains f then return true
+            end repeat
+        end if
+    end repeat
+    return false
+end accountMatchesFilter
+
+-- Search messages across all mailboxes with prefix support
+-- Prefixes: from:, to:, subject:, body: (plain query searches all fields)
+-- Three-phase approach: 1) subject+sender (fast), 2) recipients (to: only), 3) body content (slow)
+on searchMessages(query, accountFilter)
+    -- Parse query prefix
+    set searchMode to "general"
+    set searchTerm to query
+    set queryLen to count of query
+
+    if queryLen > 5 and query starts with "from:" then
+        set searchMode to "from"
+        set searchTerm to text 6 thru -1 of query
+    else if queryLen > 3 and query starts with "to:" then
+        set searchMode to "to"
+        set searchTerm to text 4 thru -1 of query
+    else if queryLen > 8 and query starts with "subject:" then
+        set searchMode to "subject"
+        set searchTerm to text 9 thru -1 of query
+    else if queryLen > 5 and query starts with "body:" then
+        set searchMode to "body"
+        set searchTerm to text 6 thru -1 of query
+    end if
+
+    set output to {}
+    set seenIds to {}
+    set maxResults to 25
+
+    tell application "Mail"
+        set allAccounts to accounts
+    end tell
+
+    -- Phase 1: Fast search via whose clause (subject/sender) across ALL mailboxes
+    if searchMode is not "to" and searchMode is not "body" then
+        tell application "Mail"
+            repeat with acc in allAccounts
+                if (count of output) ≥ maxResults then exit repeat
+                if my accountMatchesFilter(acc, accountFilter) then
+                    repeat with mb in mailboxes of acc
+                        if (count of output) ≥ maxResults then exit repeat
+                        try
+                            with timeout of 10 seconds
+                                if searchMode is "from" then
+                                    set foundMsgs to (messages of mb whose sender contains searchTerm)
+                                else if searchMode is "subject" then
+                                    set foundMsgs to (messages of mb whose subject contains searchTerm)
+                                else
+                                    set foundMsgs to (messages of mb whose subject contains searchTerm or sender contains searchTerm)
+                                end if
+                            end timeout
+                            repeat with msg in foundMsgs
+                                if (count of output) ≥ maxResults then exit repeat
+                                set msgId to id of msg as text
+                                if seenIds does not contain msgId then
+                                    set end of seenIds to msgId
+                                    set msgLine to msgId & " | " & (date sent of msg as text) & " | " & (sender of msg) & " | " & (subject of msg)
+                                    set end of output to msgLine
+                                end if
+                            end repeat
+                        end try
+                    end repeat
+                end if
+            end repeat
+        end tell
+    end if
+
+    -- Phase 2: Recipient search (to: prefix only, manual iteration)
+    if searchMode is "to" then
+        tell application "Mail"
+            repeat with acc in allAccounts
+                if (count of output) ≥ maxResults then exit repeat
+                if my accountMatchesFilter(acc, accountFilter) then
+                    repeat with mb in mailboxes of acc
+                        if (count of output) ≥ maxResults then exit repeat
+                        try
+                            set msgCount to count of messages of mb
+                            if msgCount > 200 then set msgCount to 200
+                            if msgCount > 0 then
+                                with timeout of 10 seconds
+                                    set msgs to messages 1 thru msgCount of mb
+                                end timeout
+                                repeat with msg in msgs
+                                    if (count of output) ≥ maxResults then exit repeat
+                                    try
+                                        set matched to false
+                                        repeat with recip in to recipients of msg
+                                            try
+                                                if (address of recip) contains searchTerm then set matched to true
+                                            end try
+                                            if not matched then
+                                                try
+                                                    if (name of recip) contains searchTerm then set matched to true
+                                                end try
+                                            end if
+                                            if matched then exit repeat
+                                        end repeat
+                                        if matched then
+                                            set msgId to id of msg as text
+                                            if seenIds does not contain msgId then
+                                                set end of seenIds to msgId
+                                                set msgLine to msgId & " | " & (date sent of msg as text) & " | " & (sender of msg) & " | " & (subject of msg)
+                                                set end of output to msgLine
+                                            end if
+                                        end if
+                                    end try
+                                end repeat
+                            end if
+                        end try
+                    end repeat
+                end if
+            end repeat
+        end tell
+    end if
+
+    -- Phase 3: Body content search (slow - only for body: prefix or general with no Phase 1 results)
+    if searchMode is "body" or (searchMode is "general" and (count of output) is 0) then
+        tell application "Mail"
+            repeat with acc in allAccounts
+                if (count of output) ≥ maxResults then exit repeat
+                if my accountMatchesFilter(acc, accountFilter) then
+                    repeat with mb in mailboxes of acc
+                        if (count of output) ≥ maxResults then exit repeat
+                        try
+                            with timeout of 15 seconds
+                                set foundMsgs to (messages of mb whose content contains searchTerm)
+                            end timeout
+                            repeat with msg in foundMsgs
+                                if (count of output) ≥ maxResults then exit repeat
+                                set msgId to id of msg as text
+                                if seenIds does not contain msgId then
+                                    set end of seenIds to msgId
+                                    set msgLine to msgId & " | " & (date sent of msg as text) & " | " & (sender of msg) & " | " & (subject of msg)
+                                    set end of output to msgLine
+                                end if
+                            end repeat
+                        end try
+                    end repeat
+                end if
+            end repeat
+        end tell
+    end if
+
+    if (count of output) is 0 then
+        return "No messages found matching: " & query
+    end if
     return my joinList(output, linefeed)
 end searchMessages
 
@@ -250,7 +430,11 @@ on draftMessage(toAddr, subjectText, bodyText, senderAddr, ccAddr, bccAddr, atta
             set newMessage to make new outgoing message with properties {subject:subjectText, content:bodyText, visible:true}
         end if
         tell newMessage
-            make new to recipient at end of to recipients with properties {address:toAddr}
+            -- Set To recipients (supports comma-separated list)
+            set toList to my splitCommaList(toAddr)
+            repeat with addr in toList
+                make new to recipient at end of to recipients with properties {address:addr}
+            end repeat
             -- Set CC if specified (supports comma-separated list)
             if ccAddr is not "" then
                 set ccList to my splitCommaList(ccAddr)
@@ -636,6 +820,98 @@ on listAttachments(messageId)
         return my joinList(output, linefeed)
     end tell
 end listAttachments
+
+-- Forward a message (saves as draft with forwarded content)
+on forwardMessage(messageId, toAddr, bodyText, senderAddr, ccAddr, bccAddr, attachmentPaths)
+    tell application "Mail"
+        -- Find the original message by ID
+        repeat with acc in accounts
+            repeat with mb in mailboxes of acc
+                try
+                    set origMsg to (first message of mb whose id is messageId)
+                    -- Use forward to create the forwarded message
+                    set fwdMsg to forward origMsg with opening window
+                    -- Set To recipients (supports comma-separated list)
+                    set toList to my splitCommaList(toAddr)
+                    tell fwdMsg
+                        repeat with addr in toList
+                            make new to recipient at end of to recipients with properties {address:addr}
+                        end repeat
+                    end tell
+                    -- Set sender if specified
+                    if senderAddr is not "" then
+                        set sender of fwdMsg to senderAddr
+                    end if
+                    -- Add CC recipients (supports comma-separated list)
+                    if ccAddr is not "" then
+                        set ccList to my splitCommaList(ccAddr)
+                        tell fwdMsg
+                            repeat with addr in ccList
+                                make new cc recipient at end of cc recipients with properties {address:addr}
+                            end repeat
+                        end tell
+                    end if
+                    -- Add BCC recipients (supports comma-separated list)
+                    if bccAddr is not "" then
+                        set bccList to my splitCommaList(bccAddr)
+                        tell fwdMsg
+                            repeat with addr in bccList
+                                make new bcc recipient at end of bcc recipients with properties {address:addr}
+                            end repeat
+                        end tell
+                    end if
+                    -- Add attachments
+                    tell fwdMsg
+                        repeat with attachPath in attachmentPaths
+                            set attachFile to POSIX file (attachPath as text) as alias
+                            make new attachment with properties {file name:attachFile} at after the last paragraph
+                            delay 1
+                        end repeat
+                    end tell
+                    -- Wait for compose window to fully load with forwarded content
+                    set attachCount to count of attachmentPaths
+                    if attachCount > 0 then
+                        delay (attachCount * 1 + 2)
+                    else
+                        delay 2
+                    end if
+                    -- Insert body text via clipboard paste at cursor position
+                    -- (cursor starts at top of forward body, above forwarded content)
+                    if bodyText is not "" then
+                        set oldClipboard to the clipboard
+                        set the clipboard to bodyText & linefeed & linefeed
+                        tell application "Mail"
+                            activate
+                        end tell
+                        delay 0.5
+                        tell application "System Events"
+                            tell process "Mail"
+                                set frontmost to true
+                                delay 0.3
+                                keystroke "v" using command down
+                            end tell
+                        end tell
+                        delay 0.5
+                        set the clipboard to oldClipboard
+                    end if
+                    -- Build status message
+                    set extras to ""
+                    if ccAddr is not "" then
+                        set extras to extras & " cc:" & ccAddr
+                    end if
+                    if bccAddr is not "" then
+                        set extras to extras & " bcc:" & bccAddr
+                    end if
+                    if attachCount > 0 then
+                        set extras to extras & " (" & attachCount & " attachments)"
+                    end if
+                    return "OK: Forward draft opened (to " & toAddr & ", fwd: " & subject of origMsg & ")" & extras
+                end try
+            end repeat
+        end repeat
+        return "Message not found: " & messageId
+    end tell
+end forwardMessage
 
 -- Helper: Split comma-separated string into a list, trimming whitespace
 on splitCommaList(theString)

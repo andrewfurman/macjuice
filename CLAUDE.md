@@ -21,7 +21,12 @@ This adds `macjuice` to PATH.
 macjuice mail accounts                              # List all mail accounts
 macjuice mail list                                   # List recent inbox emails
 macjuice mail list "Drafts"                          # List messages in a specific mailbox
-macjuice mail search "from:boss subject:urgent"      # Search emails
+macjuice mail search "insurify"                         # All fields, all mailboxes
+macjuice mail search "from:boss"                        # Sender only (fast)
+macjuice mail search "subject:urgent"                   # Subject only (fast)
+macjuice mail search "to:client@example.com"            # Recipient search
+macjuice mail search "body:contract"                    # Body content (slower)
+macjuice mail search "insurify" --account andrew@ad-ga.com  # Specific account
 macjuice mail read <message-id>                      # Read a specific email
 macjuice mail send "user@example.com" "Subject" "Body"   # Send an email
 macjuice mail send "user@example.com" "Subject" "Body" --from=me@icloud.com  # Send from specific account

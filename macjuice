@@ -94,7 +94,8 @@ show_app_help() {
             echo "Commands:"
             echo "  accounts              List all mail accounts"
             echo "  list [mailbox]        List recent emails (default: INBOX)"
-            echo "  search <query>        Search emails (searches INBOX + Sent across all accounts)"
+            echo "  search <query>        Search emails across ALL mailboxes"
+            echo "    Prefixes: from:, to:, subject:, body: (plain = all fields)"
             echo "    --account <emails>  Filter to specific accounts (comma-separated)"
             echo "  read <message-id>     Read a specific email"
             echo "  attachments <id>      List attachments on a message"
@@ -104,6 +105,7 @@ show_app_help() {
             echo "  html-draft <to> <subj> <html-file> Open a rich HTML email draft"
             echo "  delete-draft <id>     Delete a draft by message ID"
             echo "  reply <id> <body>     Reply to a message (saves as draft)"
+            echo "  forward <id> <to>     Forward a message (saves as draft)"
             echo ""
             echo "Draft options:"
             echo "  --account <name>      Send from a specific account"
@@ -115,6 +117,13 @@ show_app_help() {
             echo "  --from <email>        Send from a specific account"
             echo "  --cc <emails>         Add CC recipients (comma-separated)"
             echo "  --bcc <emails>        Add BCC recipients (comma-separated)"
+            echo ""
+            echo "Forward options:"
+            echo "  --account <name>      Send from a specific account"
+            echo "  --cc <emails>         Add CC recipients (comma-separated)"
+            echo "  --bcc <emails>        Add BCC recipients (comma-separated)"
+            echo "  --body <text>         Prepend text above the forwarded content"
+            echo "  --attach <file>       Attach a file (repeatable for multiple files)"
             ;;
         notes)
             echo -e "${CYAN}macjuice notes${NC} - Notes management"
@@ -520,6 +529,47 @@ ENDSCRIPT
                     [[ -n "$cc" ]] && args+=("--cc=$cc")
                     [[ -n "$bcc" ]] && args+=("--bcc=$bcc")
                     run_applescript "mail" "reply" "${args[@]}"
+                    ;;
+                forward)
+                    # Parse: macjuice mail forward <message-id> <to> [--account <name>] [--cc <emails>] [--bcc <emails>] [--body <text>] [--attach <file> ...]
+                    if [[ $# -lt 2 ]]; then
+                        echo -e "${RED}Error:${NC} forward requires <message-id> <to>"
+                        echo "Usage: macjuice mail forward <message-id> <to> [--account <name>] [--cc <emails>] [--bcc <emails>] [--body <text>] [--attach <file> ...]"
+                        exit 1
+                    fi
+                    local msg_id="$1" to_addr="$2"
+                    shift 2
+                    local from_flag="" cc="" bcc="" body=""
+                    local -a attachments=()
+
+                    # Parse optional flags
+                    while [[ $# -gt 0 ]]; do
+                        case "$1" in
+                            --account=*) from_flag="${1#--account=}"; shift ;;
+                            --account) from_flag="$2"; shift 2 ;;
+                            --from=*)  from_flag="${1#--from=}"; shift ;;
+                            --from)    from_flag="$2"; shift 2 ;;
+                            --cc=*)    cc="${1#--cc=}"; shift ;;
+                            --cc)      cc="$2"; shift 2 ;;
+                            --bcc=*)   bcc="${1#--bcc=}"; shift ;;
+                            --bcc)     bcc="$2"; shift 2 ;;
+                            --body=*)  body="${1#--body=}"; shift ;;
+                            --body)    body="$2"; shift 2 ;;
+                            --attach=*) attachments+=("${1#--attach=}"); shift ;;
+                            --attach) attachments+=("$2"); shift 2 ;;
+                            *)         shift ;;
+                        esac
+                    done
+
+                    local args=("$msg_id" "$to_addr")
+                    [[ -n "$from_flag" ]] && args+=("--from=$from_flag")
+                    [[ -n "$cc" ]] && args+=("--cc=$cc")
+                    [[ -n "$bcc" ]] && args+=("--bcc=$bcc")
+                    [[ -n "$body" ]] && args+=("--body=$body")
+                    for att in "${attachments[@]}"; do
+                        args+=("$att")
+                    done
+                    run_applescript "mail" "forward" "${args[@]}"
                     ;;
                 delete-draft)
                     # Parse: macjuice mail delete-draft <message-id>

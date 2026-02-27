@@ -33,7 +33,11 @@ cd macjuice
 ```bash
 # Mail
 macjuice mail list                          # List recent emails
-macjuice mail search "from:boss subject:urgent"
+macjuice mail search "insurify"                  # All fields, all mailboxes
+macjuice mail search "from:boss"                 # Sender only (fast)
+macjuice mail search "subject:urgent"            # Subject only (fast)
+macjuice mail search "body:contract"             # Body content search
+macjuice mail search "insurify" --account me@gmail.com  # Specific account
 macjuice mail send "user@example.com" "Subject" "Body"
 macjuice mail accounts                      # List all mail accounts
 
