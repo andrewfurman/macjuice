@@ -336,8 +336,70 @@ on parseDuration(durationStr)
     return totalMins
 end parseDuration
 
--- Helper: Parse date/time string (basic parser)
+-- Helper: Parse date/time string (handles ISO "YYYY-MM-DD HH:MM" and natural formats)
 on parseDateTime(dateStr)
+    -- Check for ISO-like format: YYYY-MM-DD or YYYY-MM-DD HH:MM
+    if dateStr contains "-" and (character 5 of dateStr is "-") then
+        try
+            set AppleScript's text item delimiters to " "
+            set dateParts to text items of dateStr
+            set dateOnly to item 1 of dateParts
+
+            -- Parse date portion
+            set AppleScript's text item delimiters to "-"
+            set ymd to text items of dateOnly
+            set theYear to (item 1 of ymd) as integer
+            set theMonth to (item 2 of ymd) as integer
+            set theDay to (item 3 of ymd) as integer
+
+            -- Parse time portion (default to noon if missing)
+            set theHours to 12
+            set theMins to 0
+            if (count of dateParts) > 1 then
+                set timePart to item 2 of dateParts
+                set AppleScript's text item delimiters to ":"
+                set hm to text items of timePart
+                set theHours to (item 1 of hm) as integer
+                if (count of hm) > 1 then set theMins to (item 2 of hm) as integer
+            end if
+
+            set AppleScript's text item delimiters to ""
+
+            -- Build the date using a known-working format: "Month Day, Year HH:MM:SS"
+            set monthNames to {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"}
+            set monthName to item theMonth of monthNames
+
+            -- Convert 24-hour to 12-hour format with AM/PM
+            set ampm to "AM"
+            set displayHour to theHours
+            if theHours = 0 then
+                set displayHour to 12
+                set ampm to "AM"
+            else if theHours < 12 then
+                set displayHour to theHours
+                set ampm to "AM"
+            else if theHours = 12 then
+                set displayHour to 12
+                set ampm to "PM"
+            else
+                set displayHour to theHours - 12
+                set ampm to "PM"
+            end if
+
+            if theMins < 10 then
+                set minStr to "0" & (theMins as text)
+            else
+                set minStr to theMins as text
+            end if
+
+            set dateString to monthName & " " & theDay & ", " & theYear & " " & displayHour & ":" & minStr & ":00 " & ampm
+            return date dateString
+        on error
+            -- Fall through to native parsing
+        end try
+    end if
+
+    -- Try native AppleScript date parsing (handles "March 8, 2026 9:00 AM", etc.)
     try
         return date dateStr
     on error
