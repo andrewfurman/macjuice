@@ -109,6 +109,12 @@ on run argv
         else
             return "Usage: mail.applescript attach <message-id> <file1> [file2] ..."
         end if
+    else if cmd is "attachments" then
+        if (count of argv) > 1 then
+            return listAttachments(item 2 of argv)
+        else
+            return "Usage: mail.applescript attachments <message-id>"
+        end if
     else if cmd is "delete-draft" then
         if (count of argv) > 1 then
             return deleteDraft(item 2 of argv)
@@ -516,12 +522,29 @@ on attachToDraft(messageId, filePaths)
         -- Find the draft message across all accounts/mailboxes
         set foundMsg to missing value
         set foundSubj to ""
+        set foundContent to ""
+        set foundSender to ""
+        set foundToAddrs to {}
+        set foundCcAddrs to {}
+        set foundBccAddrs to {}
         repeat with acc in accounts
             repeat with mb in mailboxes of acc
                 try
                     set msg to (first message of mb whose id is (messageId as integer))
                     set foundMsg to msg
                     set foundSubj to subject of msg
+                    set foundContent to content of msg
+                    set foundSender to sender of msg
+                    -- Collect recipients
+                    repeat with r in to recipients of msg
+                        set end of foundToAddrs to address of r
+                    end repeat
+                    repeat with r in cc recipients of msg
+                        set end of foundCcAddrs to address of r
+                    end repeat
+                    repeat with r in bcc recipients of msg
+                        set end of foundBccAddrs to address of r
+                    end repeat
                     exit repeat
                 end try
             end repeat
@@ -532,48 +555,87 @@ on attachToDraft(messageId, filePaths)
             return "Draft not found: " & messageId
         end if
 
-        -- Open the draft (opens as editable compose window)
-        open foundMsg
-        delay 3
+        -- Create a new outgoing message with the same properties + attachments
+        set newMessage to make new outgoing message with properties {subject:foundSubj, content:foundContent, sender:foundSender, visible:true}
+        tell newMessage
+            repeat with addr in foundToAddrs
+                make new to recipient at end of to recipients with properties {address:addr}
+            end repeat
+            repeat with addr in foundCcAddrs
+                make new cc recipient at end of cc recipients with properties {address:addr}
+            end repeat
+            repeat with addr in foundBccAddrs
+                make new bcc recipient at end of bcc recipients with properties {address:addr}
+            end repeat
+            -- Add the new attachments
+            set attachCount to count of filePaths
+            set attachedCount to 0
+            repeat with filePath in filePaths
+                try
+                    set attachFile to POSIX file (filePath as text) as alias
+                    make new attachment with properties {file name:attachFile} at after the last paragraph
+                    delay 1
+                    set attachedCount to attachedCount + 1
+                end try
+            end repeat
+        end tell
+
+        -- Wait for attachments to fully load
+        if attachedCount > 0 then
+            delay (attachedCount * 1 + 2)
+        end if
+
+        -- Delete the old draft
+        delete foundMsg
+
     end tell
 
-    -- Attach each file using pbcopy + paste approach
-    -- pbcopy with file references puts files on clipboard as attachable objects
-    set attachCount to count of filePaths
-    set attachedCount to 0
-    repeat with filePath in filePaths
-        set filePathStr to filePath as text
-        -- Use osascript to set the clipboard to the file reference
-        -- This puts the file on the pasteboard in a way Mail recognizes as attachment
-        try
-            do shell script "osascript -e 'set the clipboard to (POSIX file \"" & filePathStr & "\" as alias)'"
-            delay 0.5
-
-            -- Paste into Mail compose window
-            tell application "Mail"
-                activate
-            end tell
+    -- Save with Cmd+S
+    tell application "System Events"
+        tell process "Mail"
+            set frontmost to true
             delay 0.3
-            tell application "System Events"
-                tell process "Mail"
-                    set frontmost to true
-                    delay 0.2
-                    keystroke "v" using command down
-                end tell
-            end tell
-            delay 2
-            set attachedCount to attachedCount + 1
-        on error errMsg
-            -- File not found or clipboard failed, skip
-        end try
-    end repeat
-
-    -- Wait for all attachments to fully load
-    delay (attachedCount + 2)
+            keystroke "s" using command down
+        end tell
+    end tell
+    delay 2
 
     -- Compose window left open for user to review and send
-    return "OK: Attached " & attachedCount & " of " & attachCount & " file(s) to draft: " & foundSubj & " — compose window left open for review"
+    return "OK: Attached " & attachedCount & " of " & attachCount & " file(s) — new draft created with attachments, old draft removed"
 end attachToDraft
+
+on listAttachments(messageId)
+    tell application "Mail"
+        set foundMsg to missing value
+        repeat with acc in accounts
+            repeat with mb in mailboxes of acc
+                try
+                    set msg to (first message of mb whose id is (messageId as integer))
+                    set foundMsg to msg
+                    exit repeat
+                end try
+            end repeat
+            if foundMsg is not missing value then exit repeat
+        end repeat
+
+        if foundMsg is missing value then
+            return "Message not found: " & messageId
+        end if
+
+        set attList to mail attachments of foundMsg
+        if (count of attList) is 0 then
+            return "No attachments on message: " & subject of foundMsg
+        end if
+
+        set output to {}
+        repeat with att in attList
+            set attName to name of att
+            set attSize to MIME type of att
+            set end of output to attName & " (" & attSize & ")"
+        end repeat
+        return my joinList(output, linefeed)
+    end tell
+end listAttachments
 
 -- Helper: Split comma-separated string into a list, trimming whitespace
 on splitCommaList(theString)
