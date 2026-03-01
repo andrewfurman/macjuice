@@ -875,24 +875,46 @@ on forwardMessage(messageId, toAddr, bodyText, senderAddr, ccAddr, bccAddr, atta
                     else
                         delay 2
                     end if
-                    -- Insert body text via clipboard paste at cursor position
-                    -- (cursor starts at top of forward body, above forwarded content)
+                    -- Insert body text by typing line-by-line into the body area
                     if bodyText is not "" then
-                        set oldClipboard to the clipboard
-                        set the clipboard to bodyText & linefeed & linefeed
                         tell application "Mail"
                             activate
                         end tell
                         delay 0.5
+                        -- Split body text by linefeeds
+                        set {oldTID, AppleScript's text item delimiters} to {AppleScript's text item delimiters, linefeed}
+                        set bodyLines to text items of bodyText
+                        set AppleScript's text item delimiters to oldTID
+
                         tell application "System Events"
                             tell process "Mail"
                                 set frontmost to true
                                 delay 0.3
-                                keystroke "v" using command down
+                                -- Tab past header fields (To, CC, BCC, Subject) into body
+                                repeat 6 times
+                                    keystroke tab
+                                    delay 0.15
+                                end repeat
+                                delay 0.3
+                                -- Move cursor to the very top of the body
+                                key code 126 using {command down} -- Cmd+Up to go to top
+                                delay 0.3
+                                -- Type each line with Return between them
+                                repeat with i from 1 to count of bodyLines
+                                    set thisLine to item i of bodyLines
+                                    if thisLine is not "" then
+                                        keystroke thisLine
+                                    end if
+                                    if i < (count of bodyLines) then
+                                        key code 36 -- Return
+                                    end if
+                                end repeat
+                                -- Add two trailing returns to separate from forwarded content
+                                key code 36
+                                key code 36
                             end tell
                         end tell
                         delay 0.5
-                        set the clipboard to oldClipboard
                     end if
                     -- Build status message
                     set extras to ""
