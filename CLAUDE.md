@@ -40,6 +40,10 @@ macjuice mail reply <message-id> "Reply body" --from=me@icloud.com  # Reply from
 macjuice mail reply <message-id> "Reply body" --cc=extra@x.com,other@x.com  # Reply with extra CC
 macjuice mail reply <message-id> "Reply body" --bcc=hidden@x.com  # Reply with BCC
 macjuice mail reply --search "subject query" "Reply body"  # Search and reply
+macjuice mail forward <message-id> "user@example.com"    # Forward a message (saves as draft)
+macjuice mail forward <message-id> "user@example.com" --from=me@icloud.com  # Forward from specific account
+macjuice mail forward <message-id> "user@example.com" --body="See below"  # Forward with body text prepended
+macjuice mail forward <message-id> "user@example.com" --cc=a@x.com --bcc=b@x.com  # Forward with CC/BCC
 macjuice mail attach <message-id> /path/to/file1.png /path/to/file2.pdf  # Attach files to an existing draft
 macjuice mail delete-draft <message-id>                   # Delete a draft by ID
 ```

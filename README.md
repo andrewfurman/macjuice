@@ -39,6 +39,9 @@ macjuice mail search "subject:urgent"            # Subject only (fast)
 macjuice mail search "body:contract"             # Body content search
 macjuice mail search "insurify" --account me@gmail.com  # Specific account
 macjuice mail send "user@example.com" "Subject" "Body"
+macjuice mail forward <message-id> "user@example.com"        # Forward a message (draft)
+macjuice mail forward <id> "to@x.com" --body="See below"    # Forward with body prepended
+macjuice mail forward <id> "to@x.com" --cc=a@x.com --from=me@icloud.com  # Forward with CC/from
 macjuice mail accounts                      # List all mail accounts
 
 # Notes
