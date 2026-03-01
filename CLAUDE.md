@@ -35,6 +35,9 @@ macjuice mail draft "user@example.com" "Subject" "Body" --from=me@icloud.com  # 
 macjuice mail draft "user@example.com" "Subject" "Body" --cc=a@x.com --bcc=b@x.com  # Draft with CC/BCC
 macjuice mail draft "user@example.com" "Subject" "Body" --cc=a@x.com,b@x.com  # Draft with multiple CC
 macjuice mail draft "user@example.com" "Subject" "Body" /path/to/file.pdf  # Draft with attachment
+macjuice mail html-draft "user@example.com" "Subject" /path/to/file.html  # Draft with HTML body (opens compose, pastes from clipboard)
+macjuice mail html-draft "user@example.com" "Subject" "<h1>Hello</h1><p>World</p>"  # Draft with inline HTML string
+macjuice mail html-draft "user@example.com" "Subject" /path/to/file.html --from=me@icloud.com --cc=a@x.com  # HTML draft with from/CC/BCC
 macjuice mail reply <message-id> "Reply body"          # Reply-all (saves as draft)
 macjuice mail reply <message-id> "Reply body" --from=me@icloud.com  # Reply from specific account
 macjuice mail reply <message-id> "Reply body" --cc=extra@x.com,other@x.com  # Reply with extra CC

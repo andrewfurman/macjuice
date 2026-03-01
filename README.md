@@ -39,6 +39,9 @@ macjuice mail search "subject:urgent"            # Subject only (fast)
 macjuice mail search "body:contract"             # Body content search
 macjuice mail search "insurify" --account me@gmail.com  # Specific account
 macjuice mail send "user@example.com" "Subject" "Body"
+macjuice mail draft "user@example.com" "Subject" "Body"      # Save as draft
+macjuice mail html-draft "to@x.com" "Subject" report.html   # HTML draft from file
+macjuice mail html-draft "to@x.com" "Subject" "<h1>Hi</h1>" # HTML draft from string
 macjuice mail forward <message-id> "user@example.com"        # Forward a message (draft)
 macjuice mail forward <id> "to@x.com" --body="See below"    # Forward with body prepended
 macjuice mail forward <id> "to@x.com" --cc=a@x.com --from=me@icloud.com  # Forward with CC/from
@@ -97,6 +100,25 @@ macjuice home "Thermostat" 72
 macjuice facetime "+15551234567"            # Start video call
 macjuice facetime "user@icloud.com" --audio # Audio only
 ```
+
+## HTML Email Drafts
+
+The `html-draft` command lets you compose rich HTML emails (tables, formatted text, images) in Apple Mail. It accepts either an HTML file path or an inline HTML string.
+
+```bash
+# From an HTML file
+macjuice mail html-draft "user@example.com" "Monthly Report" /path/to/report.html
+
+# From an inline HTML string
+macjuice mail html-draft "user@example.com" "Hello" "<h1>Welcome</h1><p>Thanks for signing up!</p>"
+
+# With sender, CC, and BCC
+macjuice mail html-draft "user@example.com" "Report" report.html --from=me@work.com --cc=boss@work.com --bcc=archive@work.com
+```
+
+**How it works:** The command converts your HTML to RTF, loads it onto the clipboard, and opens a compose window with recipients pre-filled. You then click the email body and press **Cmd+V** to paste the formatted content.
+
+**Tip for automation (e.g. Claude Code):** After calling `html-draft`, you can programmatically Tab into the body and paste using AppleScript/System Events to skip the manual step.
 
 ## Full Disk Access (Required for Messages)
 
