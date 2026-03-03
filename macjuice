@@ -299,9 +299,22 @@ main() {
             ;;
         mail)
             case "$cmd" in
+                list)
+                    # List recent messages from a mailbox (default: INBOX)
+                    # Fast path: SQLite query against Envelope Index
+                    # Fallback: AppleScript iteration
+                    local mailbox="${1:-INBOX}"
+                    if bash "$SCRIPTS_DIR/mail-db.sh" list "$mailbox"; then
+                        :  # SQLite succeeded
+                    else
+                        run_applescript "mail" "list" "$mailbox"
+                    fi
+                    ;;
                 search)
                     # Parse: macjuice mail search <query> [--account <emails>]
                     # --account accepts comma-separated email addresses to filter by specific accounts
+                    # Fast path: SQLite query against Envelope Index
+                    # Fallback: AppleScript whose clauses (slower but works without DB access)
                     if [[ $# -lt 1 ]]; then
                         echo -e "${RED}Error:${NC} search requires a query"
                         echo "Usage: macjuice mail search <query> [--account <email1,email2,...>]"
@@ -316,7 +329,12 @@ main() {
                             *)         shift ;;
                         esac
                     done
-                    run_applescript "mail" "search" "$query" "$account_filter"
+                    # Try SQLite first, fall back to AppleScript
+                    if bash "$SCRIPTS_DIR/mail-db.sh" search "$query" "$account_filter"; then
+                        :  # SQLite succeeded
+                    else
+                        run_applescript "mail" "search" "$query" "$account_filter"
+                    fi
                     ;;
                 attachments)
                     # List attachments on a message
@@ -496,8 +514,10 @@ ENDSCRIPT
                         shift 2
 
                         # Search for the message, take the first result
+                        # Try SQLite fast path first, fall back to AppleScript
                         local search_result
-                        search_result=$(run_applescript "mail" "search" "$query")
+                        search_result=$(bash "$SCRIPTS_DIR/mail-db.sh" search "$query") || \
+                            search_result=$(run_applescript "mail" "search" "$query")
                         if [[ "$search_result" == "No messages found"* ]]; then
                             echo -e "${RED}Error:${NC} $search_result"
                             exit 1
