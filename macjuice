@@ -207,8 +207,17 @@ show_app_help() {
             echo -e "${CYAN}macjuice photos${NC} - Apple Photos"
             echo ""
             echo "Commands:"
-            echo "  recent [count]        List recent photos (default: 20)"
-            echo "  search <query>        Search by filename or description"
+            echo "  recent [count] [--since <date>]"
+            echo "                        List recent photos (default: 20)"
+            echo "  search <query>        Search all fields (filename, title, OCR, people, keywords)"
+            echo "  search person:<name>  Search by person/face name"
+            echo "  search keyword:<tag>  Search by keyword tag"
+            echo "  search ocr:<text>     Search OCR text in photos"
+            echo "  search text:<query>   Search filename, title, description only"
+            echo "  search <query> --since <date>"
+            echo "                        Filter by date (YYYY-MM-DD, today, yesterday, 3d, 1w, 2m)"
+            echo "  people                List all named people in library"
+            echo "  keywords              List all keywords in library"
             echo "  albums                List all albums"
             echo "  export <query> <dir>  Export matching photos to a folder"
             echo "  export-recent <n> <dir>  Export N recent photos"
@@ -611,12 +620,26 @@ ENDSCRIPT
             case "$cmd" in
                 search)
                     # SQLite-based search (fast, handles 166K+ photos)
+                    # Supports: person:<name>, keyword:<tag>, ocr:<text>, text:<query>
+                    # Options: --since <date>, --type <type>
                     if [[ $# -lt 1 ]]; then
                         echo -e "${RED}Error:${NC} search requires a query"
-                        echo "Usage: macjuice photos search <query>"
+                        echo "Usage: macjuice photos search <query> [--since <date>] [--type <type>]"
                         exit 1
                     fi
                     python3 "$SCRIPTS_DIR/photos_search.py" "$@"
+                    ;;
+                people)
+                    # List all named people in the Photos library
+                    python3 "$SCRIPTS_DIR/photos_search.py" --list-people
+                    ;;
+                keywords)
+                    # List all keywords in the Photos library
+                    python3 "$SCRIPTS_DIR/photos_search.py" --list-keywords
+                    ;;
+                recent)
+                    # SQLite-based recent photos (fast, supports --since)
+                    python3 "$SCRIPTS_DIR/photos_recent.py" "$@"
                     ;;
                 export)
                     # SQLite search + targeted AppleScript export (handles large libraries)
