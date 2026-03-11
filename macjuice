@@ -69,7 +69,25 @@ show_version() {
     echo "macjuice v$VERSION"
 }
 
-# Run an AppleScript
+# Default timeout for AppleScript execution (seconds)
+APPLESCRIPT_TIMEOUT="${MACJUICE_TIMEOUT:-60}"
+
+# Clean up osascript process on interrupt/termination
+_cleanup_osascript() {
+    local pid="$1"
+    if kill -0 "$pid" 2>/dev/null; then
+        kill "$pid" 2>/dev/null
+        wait "$pid" 2>/dev/null
+    fi
+    # Send a no-op command to Mail to flush any stuck AppleScript handler
+    osascript -e 'tell application "Mail" to name' &>/dev/null &
+    local flush_pid=$!
+    sleep 2
+    kill "$flush_pid" 2>/dev/null
+    wait "$flush_pid" 2>/dev/null
+}
+
+# Run an AppleScript with timeout and cleanup
 run_applescript() {
     local script="$1"
     shift
@@ -80,7 +98,30 @@ run_applescript() {
         exit 1
     fi
 
-    osascript "$script_path" "$@"
+    # Run osascript in background so we can enforce a timeout
+    osascript "$script_path" "$@" &
+    local pid=$!
+
+    # Trap signals so Ctrl+C and termination clean up properly
+    trap "_cleanup_osascript $pid; exit 130" INT
+    trap "_cleanup_osascript $pid; exit 143" TERM
+
+    # Wait for completion or timeout
+    local elapsed=0
+    while kill -0 "$pid" 2>/dev/null; do
+        if (( elapsed >= APPLESCRIPT_TIMEOUT )); then
+            _cleanup_osascript "$pid"
+            echo -e "${RED}Error:${NC} Command timed out after ${APPLESCRIPT_TIMEOUT}s. If Mail.app is unresponsive, run: macjuice mail reset" >&2
+            exit 124
+        fi
+        sleep 1
+        ((elapsed++))
+    done
+
+    # Reset traps
+    trap - INT TERM
+
+    wait "$pid"
 }
 
 # Show app-specific help
@@ -106,6 +147,7 @@ show_app_help() {
             echo "  delete-draft <id>     Delete a draft by message ID"
             echo "  reply <id> <body>     Reply to a message (saves as draft)"
             echo "  forward <id> <to>     Forward a message (saves as draft)"
+            echo "  reset                 Kill stuck AppleScript handlers and restart Mail"
             echo ""
             echo "Draft options:"
             echo "  --account <name>      Send from a specific account"
@@ -207,8 +249,17 @@ show_app_help() {
             echo -e "${CYAN}macjuice photos${NC} - Apple Photos"
             echo ""
             echo "Commands:"
-            echo "  recent [count]        List recent photos (default: 20)"
-            echo "  search <query>        Search by filename or description"
+            echo "  recent [count] [--since <date>]"
+            echo "                        List recent photos (default: 20)"
+            echo "  search <query>        Search all fields (filename, title, OCR, people, keywords)"
+            echo "  search person:<name>  Search by person/face name"
+            echo "  search keyword:<tag>  Search by keyword tag"
+            echo "  search ocr:<text>     Search OCR text in photos"
+            echo "  search text:<query>   Search filename, title, description only"
+            echo "  search <query> --since <date>"
+            echo "                        Filter by date (YYYY-MM-DD, today, yesterday, 3d, 1w, 2m)"
+            echo "  people                List all named people in library"
+            echo "  keywords              List all keywords in library"
             echo "  albums                List all albums"
             echo "  export <query> <dir>  Export matching photos to a folder"
             echo "  export-recent <n> <dir>  Export N recent photos"
@@ -602,6 +653,25 @@ ENDSCRIPT
                     local msg_id="$1"
                     run_applescript "mail" "delete-draft" "$msg_id"
                     ;;
+                reset)
+                    # Kill any stuck osascript processes targeting Mail and restart Mail.app
+                    echo -e "${YELLOW}Resetting Mail.app...${NC}"
+                    # Kill any osascript processes that are talking to Mail
+                    pkill -f "osascript.*mail" 2>/dev/null || true
+                    # Quit Mail gracefully first, force-kill if it doesn't respond
+                    osascript -e 'tell application "Mail" to quit' 2>/dev/null &
+                    local quit_pid=$!
+                    sleep 3
+                    if kill -0 "$quit_pid" 2>/dev/null; then
+                        kill "$quit_pid" 2>/dev/null
+                        killall Mail 2>/dev/null || true
+                        echo -e "  Force-killed Mail.app (it was unresponsive)"
+                    fi
+                    wait "$quit_pid" 2>/dev/null || true
+                    sleep 1
+                    open -a Mail
+                    echo -e "${GREEN}OK:${NC} Mail.app restarted"
+                    ;;
                 *)
                     run_applescript "mail" "$cmd" "$@"
                     ;;
@@ -611,12 +681,26 @@ ENDSCRIPT
             case "$cmd" in
                 search)
                     # SQLite-based search (fast, handles 166K+ photos)
+                    # Supports: person:<name>, keyword:<tag>, ocr:<text>, text:<query>
+                    # Options: --since <date>, --type <type>
                     if [[ $# -lt 1 ]]; then
                         echo -e "${RED}Error:${NC} search requires a query"
-                        echo "Usage: macjuice photos search <query>"
+                        echo "Usage: macjuice photos search <query> [--since <date>] [--type <type>]"
                         exit 1
                     fi
                     python3 "$SCRIPTS_DIR/photos_search.py" "$@"
+                    ;;
+                people)
+                    # List all named people in the Photos library
+                    python3 "$SCRIPTS_DIR/photos_search.py" --list-people
+                    ;;
+                keywords)
+                    # List all keywords in the Photos library
+                    python3 "$SCRIPTS_DIR/photos_search.py" --list-keywords
+                    ;;
+                recent)
+                    # SQLite-based recent photos (fast, supports --since)
+                    python3 "$SCRIPTS_DIR/photos_recent.py" "$@"
                     ;;
                 export)
                     # SQLite search + targeted AppleScript export (handles large libraries)

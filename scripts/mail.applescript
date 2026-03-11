@@ -179,7 +179,7 @@ end run
 -- List all mail accounts
 on listAccounts()
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             set accountList to {}
             repeat with acc in accounts
                 set end of accountList to (name of acc) & " (" & (email addresses of acc as text) & ")"
@@ -192,7 +192,7 @@ end listAccounts
 -- List messages in a mailbox
 on listMessages(mailboxName)
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             set output to {}
             set maxMessages to 20
 
@@ -222,7 +222,7 @@ end listMessages
 on accountMatchesFilter(acc, filterStr)
     if filterStr is "" then return true
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             set accName to name of acc
             set accEmails to email addresses of acc
         end timeout
@@ -285,7 +285,7 @@ on searchMessages(query, accountFilter)
     set maxResults to 25
 
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 15 seconds
             set allAccounts to accounts
         end timeout
     end tell
@@ -293,7 +293,7 @@ on searchMessages(query, accountFilter)
     -- Phase 1: Fast search via whose clause (subject/sender) across ALL mailboxes
     if searchMode is not "to" and searchMode is not "body" then
         tell application "Mail"
-            with timeout of 600 seconds
+            with timeout of 30 seconds
             repeat with acc in allAccounts
                 if (count of output) ≥ maxResults then exit repeat
                 if my accountMatchesFilter(acc, accountFilter) then
@@ -329,7 +329,7 @@ on searchMessages(query, accountFilter)
     -- Phase 2: Recipient search (to: prefix only, manual iteration)
     if searchMode is "to" then
         tell application "Mail"
-            with timeout of 600 seconds
+            with timeout of 30 seconds
             repeat with acc in allAccounts
                 if (count of output) ≥ maxResults then exit repeat
                 if my accountMatchesFilter(acc, accountFilter) then
@@ -379,7 +379,7 @@ on searchMessages(query, accountFilter)
     -- Phase 3: Body content search (slow - only for body: prefix or general with no Phase 1 results)
     if searchMode is "body" or (searchMode is "general" and (count of output) is 0) then
         tell application "Mail"
-            with timeout of 600 seconds
+            with timeout of 30 seconds
             repeat with acc in allAccounts
                 if (count of output) ≥ maxResults then exit repeat
                 if my accountMatchesFilter(acc, accountFilter) then
@@ -415,7 +415,7 @@ end searchMessages
 -- Read a specific message
 on readMessage(messageId)
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             repeat with acc in accounts
                 repeat with mb in mailboxes of acc
                     try
@@ -438,7 +438,7 @@ end readMessage
 -- When --from is specified, saves to that account's Drafts folder (not iCloud default)
 on draftMessage(toAddr, subjectText, bodyText, senderAddr, ccAddr, bccAddr, attachmentPaths)
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             activate
             -- Create outgoing message with sender in initial properties so Mail routes to correct account
             if senderAddr is not "" then
@@ -508,7 +508,7 @@ on draftMessage(toAddr, subjectText, bodyText, senderAddr, ccAddr, bccAddr, atta
     end tell
     delay 0.5
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             set fromNote to ""
             if senderAddr is not "" then
                 set fromNote to " from " & senderAddr
@@ -533,7 +533,7 @@ end draftMessage
 -- Clipboard must already be loaded with RTF content before calling this
 on htmlDraftMessage(toAddr, subjectText, senderAddr, ccAddr, bccAddr)
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             activate
             if senderAddr is not "" then
                 set newMessage to make new outgoing message with properties {subject:subjectText, content:"PLACEHOLDER_BODY", sender:senderAddr, visible:true}
@@ -598,7 +598,7 @@ end htmlDraftMessage
 -- Send a new message
 on sendMessage(toAddr, subjectText, bodyText, senderAddr, attachmentPaths)
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             set newMessage to make new outgoing message with properties {subject:subjectText, content:bodyText, visible:true}
             tell newMessage
                 make new to recipient at end of to recipients with properties {address:toAddr}
@@ -624,7 +624,7 @@ end sendMessage
 -- Delete a draft message by ID
 on deleteDraft(messageId)
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             repeat with acc in accounts
                 repeat with mb in mailboxes of acc
                     try
@@ -643,7 +643,7 @@ end deleteDraft
 -- Reply-all to an existing message (saves as draft, preserves quoted thread)
 on replyMessage(messageId, bodyText, senderAddr, ccAddr, bccAddr)
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             -- Find the original message by ID (same pattern as readMessage)
             repeat with acc in accounts
                 repeat with mb in mailboxes of acc
@@ -692,22 +692,22 @@ on replyMessage(messageId, bodyText, senderAddr, ccAddr, bccAddr)
                         delay 2
                         -- Insert body text via clipboard paste at cursor position
                         -- (cursor starts at top of reply body, above quoted thread)
-                        -- Setting the content property directly wipes the HTML-formatted
-                        -- quoted thread, so clipboard paste is the reliable approach
+                        -- We use clipboard paste because setting the content property
+                        -- directly wipes the HTML-formatted quoted thread
                         set oldClipboard to the clipboard
                         set the clipboard to bodyText & linefeed & linefeed
                         tell application "Mail"
                             activate
                         end tell
-                        delay 0.5
+                        delay 1
                         tell application "System Events"
                             tell process "Mail"
                                 set frontmost to true
-                                delay 0.3
+                                delay 0.5
                                 keystroke "v" using command down
                             end tell
                         end tell
-                        delay 0.5
+                        delay 1
                         set the clipboard to oldClipboard
                         -- Build status message
                         set extras to ""
@@ -730,7 +730,7 @@ end replyMessage
 -- Opens the draft as a compose window, adds attachments, and leaves open for review
 on attachToDraft(messageId, filePaths)
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             activate
             -- Find the draft message across all accounts/mailboxes
             set foundMsg to missing value
@@ -819,7 +819,7 @@ end attachToDraft
 
 on listAttachments(messageId)
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             set foundMsg to missing value
             repeat with acc in accounts
                 repeat with mb in mailboxes of acc
@@ -855,7 +855,7 @@ end listAttachments
 -- Forward a message (saves as draft with forwarded content)
 on forwardMessage(messageId, toAddr, bodyText, senderAddr, ccAddr, bccAddr, attachmentPaths)
     tell application "Mail"
-        with timeout of 600 seconds
+        with timeout of 30 seconds
             -- Find the original message by ID
             repeat with acc in accounts
                 repeat with mb in mailboxes of acc
