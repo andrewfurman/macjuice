@@ -38,6 +38,8 @@ macjuice mail draft "user@example.com" "Subject" "Body" /path/to/file.pdf  # Dra
 macjuice mail html-draft "user@example.com" "Subject" /path/to/file.html  # Draft with HTML body (opens compose, pastes from clipboard)
 macjuice mail html-draft "user@example.com" "Subject" "<h1>Hello</h1><p>World</p>"  # Draft with inline HTML string
 macjuice mail html-draft "user@example.com" "Subject" /path/to/file.html --from=me@icloud.com --cc=a@x.com  # HTML draft with from/CC/BCC
+# NOTE: html-draft requires PyObjC/AppKit for its Python helper (mail_html_clipboard.py).
+# If AppKit is not available, see the "HTML Email Workaround (without AppKit)" in Common Patterns below.
 macjuice mail reply <message-id> "Reply body"          # Reply-all (saves as draft)
 macjuice mail reply <message-id> "Reply body" --from=me@icloud.com  # Reply from specific account
 macjuice mail reply <message-id> "Reply body" --cc=extra@x.com,other@x.com  # Reply with extra CC
@@ -188,6 +190,61 @@ macjuice/
 ```bash
 macjuice mail draft "recipient@example.com" "Subject line" "Email body text here" --from=me@icloud.com
 ```
+
+**HTML Email Workaround (without AppKit):**
+
+The preferred approach for HTML emails is `macjuice mail html-draft`, but it depends on a Python helper (`mail_html_clipboard.py`) that requires PyObjC/AppKit, which isn't always available in every Python environment.
+
+If AppKit is not available, use this two-step workaround:
+
+**Step 1 — Load HTML as RTF into the clipboard using Swift:**
+```bash
+swift -e '
+import Cocoa
+let html = try! String(contentsOfFile: "/path/to/email.html", encoding: .utf8)
+let data = html.data(using: .utf8)!
+let attrStr = NSAttributedString(html: data, documentAttributes: nil)!
+let rtfData = attrStr.rtf(from: NSRange(location: 0, length: attrStr.length), documentAttributes: [:])!
+let pasteboard = NSPasteboard.general
+pasteboard.clearContents()
+pasteboard.setData(rtfData, forType: .rtf)
+print("OK")
+'
+```
+
+**Step 2 — Create a compose window and paste via AppleScript:**
+```bash
+osascript -e '
+tell application "Mail"
+    activate
+    set newMessage to make new outgoing message with properties {subject:"Subject", content:" ", sender:"from@example.com", visible:true}
+    tell newMessage
+        make new to recipient at end of to recipients with properties {address:"to@example.com"}
+        make new cc recipient at end of cc recipients with properties {address:"cc@example.com"}
+    end tell
+end tell
+delay 2
+tell application "System Events"
+    tell process "Mail"
+        set frontmost to true
+        delay 0.5
+        keystroke tab
+        delay 0.3
+        keystroke tab
+        delay 0.3
+        keystroke tab
+        delay 0.3
+        keystroke tab
+        delay 0.3
+        keystroke "a" using command down
+        delay 0.3
+        keystroke "v" using command down
+    end tell
+end tell
+'
+```
+
+The Swift step converts HTML to RTF and places it on the clipboard. The AppleScript step opens a new compose window, tabs into the body field, selects all placeholder content, and pastes the formatted HTML from the clipboard. Replace the addresses, subject, and file path with actual values.
 
 **Checking today's schedule:**
 ```bash
