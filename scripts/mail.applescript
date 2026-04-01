@@ -654,15 +654,6 @@ on replyMessage(messageId, bodyText, senderAddr, ccAddr, bccAddr)
                         if senderAddr is not "" then
                             set sender of replyMsg to senderAddr
                         end if
-                        -- Add additional CC recipients (supports comma-separated list)
-                        if ccAddr is not "" then
-                            set ccList to my splitCommaList(ccAddr)
-                            tell replyMsg
-                                repeat with addr in ccList
-                                    make new cc recipient at end of cc recipients with properties {address:addr}
-                                end repeat
-                            end tell
-                        end if
                         -- Collect existing To/CC/BCC addresses to avoid duplicates
                         set existingAddrs to {}
                         tell replyMsg
@@ -676,6 +667,19 @@ on replyMessage(messageId, bodyText, senderAddr, ccAddr, bccAddr)
                                 set end of existingAddrs to address of r
                             end repeat
                         end tell
+                        -- Add CC recipients, skipping any already in To/CC/BCC
+                        if ccAddr is not "" then
+                            set ccList to my splitCommaList(ccAddr)
+                            tell replyMsg
+                                repeat with addr in ccList
+                                    set addrText to addr as text
+                                    if existingAddrs does not contain addrText then
+                                        make new cc recipient at end of cc recipients with properties {address:addrText}
+                                        set end of existingAddrs to addrText
+                                    end if
+                                end repeat
+                            end tell
+                        end if
                         -- Add BCC recipients, skipping any already in To/CC/BCC
                         if bccAddr is not "" then
                             set bccList to my splitCommaList(bccAddr)
@@ -684,6 +688,7 @@ on replyMessage(messageId, bodyText, senderAddr, ccAddr, bccAddr)
                                     set addrText to addr as text
                                     if existingAddrs does not contain addrText then
                                         make new bcc recipient at end of bcc recipients with properties {address:addrText}
+                                        set end of existingAddrs to addrText
                                     end if
                                 end repeat
                             end tell
