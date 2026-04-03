@@ -34,7 +34,7 @@ macjuice mail draft "user@example.com" "Subject" "Body"  # Save email as draft
 macjuice mail draft "user@example.com" "Subject" "Body" --from=me@icloud.com  # Draft from specific account
 macjuice mail draft "user@example.com" "Subject" "Body" --cc=a@x.com --bcc=b@x.com  # Draft with CC/BCC
 macjuice mail draft "user@example.com" "Subject" "Body" --cc=a@x.com,b@x.com  # Draft with multiple CC
-macjuice mail draft "user@example.com" "Subject" "Body" /path/to/file.pdf  # Draft with attachment
+macjuice mail draft "user@example.com" "Subject" "Body" /path/to/file.pdf  # Draft with attachment (UNRELIABLE - see note below)
 macjuice mail html-draft "user@example.com" "Subject" /path/to/file.html  # Draft with HTML body (opens compose, pastes from clipboard)
 macjuice mail html-draft "user@example.com" "Subject" "<h1>Hello</h1><p>World</p>"  # Draft with inline HTML string
 macjuice mail html-draft "user@example.com" "Subject" /path/to/file.html --from=me@icloud.com --cc=a@x.com  # HTML draft with from/CC/BCC
@@ -54,6 +54,19 @@ macjuice mail delete-draft <message-id>                   # Delete a draft by ID
 ```
 
 Use `macjuice mail list Drafts` to find draft message IDs for deletion.
+
+**IMPORTANT: Attaching files to drafts requires a two-step process.** Passing attachment paths as positional args to `macjuice mail draft` is unreliable (the attachment often silently fails to attach). Instead, use:
+
+```bash
+# Step 1: Create the draft without attachment
+macjuice mail draft "to@example.com" "Subject" "Body" --from=me@example.com --cc=a@x.com
+
+# Step 2: Find the draft ID and attach separately
+macjuice mail list "Drafts"   # get the ID of the draft you just created
+macjuice mail attach <draft-id> /path/to/file.pdf
+```
+
+This two-step approach works reliably every time.
 
 The `--cc` and `--bcc` flags accept comma-separated email addresses for multiple recipients.
 
