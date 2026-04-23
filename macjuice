@@ -138,6 +138,11 @@ show_app_help() {
             echo "  search <query>        Search emails across ALL mailboxes"
             echo "    Prefixes: from:, to:, subject:, body: (plain = all fields)"
             echo "    --account <emails>  Filter to specific accounts (comma-separated)"
+            echo "    --limit N           Cap messages scanned per mailbox in the AppleScript"
+            echo "                        fallback (default 2000). Protects against Mail.app"
+            echo "                        timeouts on very large inboxes."
+            echo "    --all               Remove the scan cap (equivalent to --limit 0)."
+            echo "                        May time out on 100k+ message mailboxes."
             echo "  read <message-id>     Read a specific email"
             echo "  attachments <id>      List attachments on a message"
             echo "  save-attachments <id> <dir>  Save attachments to a directory"
@@ -362,29 +367,44 @@ main() {
                     fi
                     ;;
                 search)
-                    # Parse: macjuice mail search <query> [--account <emails>]
+                    # Parse: macjuice mail search <query> [--account <emails>] [--limit N] [--all]
                     # --account accepts comma-separated email addresses to filter by specific accounts
-                    # Fast path: SQLite query against Envelope Index
-                    # Fallback: AppleScript whose clauses (slower but works without DB access)
+                    # --limit N caps how many of the most-recent messages each mailbox scans
+                    #          when the AppleScript fallback runs (default 2000).
+                    # --all (or --limit 0) removes the cap. Use with caution on very large
+                    #       inboxes: broad body/text searches against 100k+ messages often
+                    #       trigger AppleEvent timeouts (-1712) in Mail.app.
+                    # Fast path: SQLite query against Envelope Index (ignores --limit, always indexed)
+                    # Fallback: AppleScript whose clauses bounded by scan limit
                     if [[ $# -lt 1 ]]; then
                         echo -e "${RED}Error:${NC} search requires a query"
-                        echo "Usage: macjuice mail search <query> [--account <email1,email2,...>]"
+                        echo "Usage: macjuice mail search <query> [--account <email1,email2,...>] [--limit N] [--all]"
                         exit 1
                     fi
                     local query="$1"
                     shift
                     local account_filter=""
+                    local scan_limit="2000"
                     while [[ $# -gt 0 ]]; do
                         case "$1" in
+                            --account=*) account_filter="${1#--account=}"; shift ;;
                             --account) account_filter="$2"; shift 2 ;;
-                            *)         shift ;;
+                            --limit=*)   scan_limit="${1#--limit=}"; shift ;;
+                            --limit)     scan_limit="$2"; shift 2 ;;
+                            --all)       scan_limit="0"; shift ;;
+                            *)           shift ;;
                         esac
                     done
-                    # Try SQLite first, fall back to AppleScript
+                    # Validate scan_limit is a non-negative integer
+                    if ! [[ "$scan_limit" =~ ^[0-9]+$ ]]; then
+                        echo -e "${RED}Error:${NC} --limit must be a non-negative integer (got: $scan_limit)"
+                        exit 1
+                    fi
+                    # Try SQLite first, fall back to AppleScript with scan cap
                     if bash "$SCRIPTS_DIR/mail-db.sh" search "$query" "$account_filter"; then
                         :  # SQLite succeeded
                     else
-                        run_applescript "mail" "search" "$query" "$account_filter"
+                        run_applescript "mail" "search" "$query" "$account_filter" "$scan_limit"
                     fi
                     ;;
                 attachments)

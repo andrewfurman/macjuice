@@ -36,8 +36,10 @@ macjuice mail list                          # List recent emails
 macjuice mail search "insurify"                  # All fields, all mailboxes
 macjuice mail search "from:boss"                 # Sender only (fast)
 macjuice mail search "subject:urgent"            # Subject only (fast)
-macjuice mail search "body:contract"             # Body content search
+macjuice mail search "body:contract"             # Body content search (capped at 2000 recent)
 macjuice mail search "insurify" --account me@gmail.com  # Specific account
+macjuice mail search "body:contract" --limit 5000 # Raise the per mailbox scan cap
+macjuice mail search "body:contract" --all        # Remove the cap entirely (may time out)
 macjuice mail send "user@example.com" "Subject" "Body"
 macjuice mail draft "user@example.com" "Subject" "Body"      # Save as draft
 macjuice mail html-draft "to@x.com" "Subject" report.html   # HTML draft from file
