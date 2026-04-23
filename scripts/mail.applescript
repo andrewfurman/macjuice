@@ -267,11 +267,15 @@ end accountMatchesFilter
 -- Prefixes: from:, to:, subject:, body: (plain query searches all fields)
 -- Three-phase approach: 1) subject+sender (fast), 2) recipients (to: only), 3) body content (slow)
 --
--- scanLimit caps how many of the most recent messages per mailbox get examined.
--- This is the primary defense against AppleEvent timeouts (-1712) on very large
--- mailboxes. A mailbox with ~150k messages cannot be iterated end to end via
--- `whose` clauses within Mail's AppleScript timeout budget, so we bound the
--- per-mailbox scan window. Pass 0 to remove the cap entirely.
+-- Phase 1 and Phase 3 rely on Mail's native `whose` filter applied directly to
+-- `messages of mb` (a class reference). That form is the only `whose` variant
+-- Mail.app evaluates reliably; applying `whose` to a pre-sliced list such as
+-- `messages 1 thru N of mb` silently returns empty in current Mail versions.
+-- We lean on the bumped `with timeout` blocks below to absorb the cost of
+-- full-mailbox `whose` scans even on very large (100k+) inboxes.
+--
+-- scanLimit still caps the manual Phase 2 recipient iteration, which walks
+-- messages one by one. Pass 0 to remove the cap for Phase 2.
 on searchMessages(query, accountFilter, scanLimit)
     -- Parse query prefix
     set searchMode to "general"
@@ -302,10 +306,10 @@ on searchMessages(query, accountFilter, scanLimit)
         end timeout
     end tell
 
-    -- Phase 1: Subject/sender search. For each mailbox we scan only the most
-    -- recent scanLimit messages instead of iterating the entire mailbox via a
-    -- bare `whose` clause against `messages of mb`. Large IMAP/Exchange
-    -- mailboxes (>100k) reliably time out if asked to filter all rows.
+    -- Phase 1: Subject/sender search. Apply the `whose` filter directly to
+    -- `messages of mb` as a class reference. Mail.app's AppleScript dispatcher
+    -- only evaluates `whose` reliably against the class reference, not against
+    -- a pre-sliced list. We rely on the bumped timeout to cover large inboxes.
     if searchMode is not "to" and searchMode is not "body" then
         tell application "Mail"
             with timeout of 120 seconds
@@ -315,22 +319,13 @@ on searchMessages(query, accountFilter, scanLimit)
                     repeat with mb in mailboxes of acc
                         if (count of output) ≥ maxResults then exit repeat
                         try
-                            with timeout of 60 seconds
-                                set mbCount to count of messages of mb
-                                if mbCount is 0 then error "empty"
-                                set windowCount to mbCount
-                                if scanLimit > 0 and windowCount > scanLimit then set windowCount to scanLimit
-                                -- Restrict the `whose` clause to the newest
-                                -- windowCount messages. This turns an O(total)
-                                -- scan into O(windowCount), which keeps broad
-                                -- body/text queries from blowing -1712.
-                                set scanWindow to messages 1 thru windowCount of mb
+                            with timeout of 90 seconds
                                 if searchMode is "from" then
-                                    set foundMsgs to (scanWindow whose sender contains searchTerm)
+                                    set foundMsgs to (messages of mb whose sender contains searchTerm)
                                 else if searchMode is "subject" then
-                                    set foundMsgs to (scanWindow whose subject contains searchTerm)
+                                    set foundMsgs to (messages of mb whose subject contains searchTerm)
                                 else
-                                    set foundMsgs to (scanWindow whose subject contains searchTerm or sender contains searchTerm)
+                                    set foundMsgs to (messages of mb whose subject contains searchTerm or sender contains searchTerm)
                                 end if
                             end timeout
                             repeat with msg in foundMsgs
@@ -403,9 +398,10 @@ on searchMessages(query, accountFilter, scanLimit)
         end tell
     end if
 
-    -- Phase 3: Body content search. Restricted to the most recent scanLimit
-    -- messages per mailbox. Full-mailbox body scans are what most commonly
-    -- trigger -1712 on ~150k-message inboxes.
+    -- Phase 3: Body content search. Apply `whose` directly to `messages of mb`
+    -- for the same reason as Phase 1. Body `whose` scans are the slowest, so
+    -- this phase only runs for an explicit `body:` query or as a fallback when
+    -- Phase 1 found nothing.
     if searchMode is "body" or (searchMode is "general" and (count of output) is 0) then
         tell application "Mail"
             with timeout of 120 seconds
@@ -415,13 +411,8 @@ on searchMessages(query, accountFilter, scanLimit)
                     repeat with mb in mailboxes of acc
                         if (count of output) ≥ maxResults then exit repeat
                         try
-                            with timeout of 90 seconds
-                                set mbCount to count of messages of mb
-                                if mbCount is 0 then error "empty"
-                                set windowCount to mbCount
-                                if scanLimit > 0 and windowCount > scanLimit then set windowCount to scanLimit
-                                set scanWindow to messages 1 thru windowCount of mb
-                                set foundMsgs to (scanWindow whose content contains searchTerm)
+                            with timeout of 120 seconds
+                                set foundMsgs to (messages of mb whose content contains searchTerm)
                             end timeout
                             repeat with msg in foundMsgs
                                 if (count of output) ≥ maxResults then exit repeat
