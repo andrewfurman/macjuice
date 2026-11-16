@@ -23,45 +23,14 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Version
-VERSION="0.1.0"
+VERSION="0.1.1"
 
-# Show help
+# Help text lives in scripts/help.sh (plain text, never calls osascript)
+# shellcheck source=scripts/help.sh
+source "$SCRIPTS_DIR/help.sh"
+
 show_help() {
-    echo -e "${CYAN}macjuice${NC} v$VERSION - CLI for Apple apps on macOS"
-    echo ""
-    echo "Usage: macjuice <app> <command> [args...]"
-    echo ""
-    echo -e "${YELLOW}Available apps:${NC}"
-    echo "  mail        Search, read, send emails"
-    echo "  notes       Create, list, search notes"
-    echo "  calendar    View and create events"
-    echo "  messages    Send and read iMessages"
-    echo "  music       Control Apple Music playback"
-    echo "  contacts    Search and manage contacts"
-    echo "  reminders   Manage reminders and tasks"
-    echo "  photos      Search and export photos"
-    echo "  shortcuts   Run any macOS Shortcut"
-    echo "  home        Control HomeKit devices (via Shortcuts)"
-    echo ""
-    echo -e "${YELLOW}Examples:${NC}"
-    echo "  macjuice mail accounts"
-    echo "  macjuice mail search \"from:boss\""
-    echo "  macjuice notes create \"Title\" \"Content\""
-    echo "  macjuice calendar today"
-    echo "  macjuice messages send \"+15551234567\" \"Hello!\""
-    echo "  macjuice messages send \"John Smith\" \"Hey, are you free tonight?\""
-    echo "  macjuice music now"
-    echo "  macjuice contacts search \"John\""
-    echo "  macjuice reminders add \"Buy milk\" \"Groceries\""
-    echo "  macjuice shortcuts list"
-    echo "  macjuice shortcuts run \"My Shortcut\""
-    echo "  macjuice home run \"Lamp On\""
-    echo ""
-    echo -e "${YELLOW}Options:${NC}"
-    echo "  --help, -h     Show this help message"
-    echo "  --version, -v  Show version"
-    echo ""
-    echo "For app-specific help: macjuice <app> --help"
+    mj_top_help
 }
 
 # Show version
@@ -127,174 +96,29 @@ run_applescript() {
 # Show app-specific help
 show_app_help() {
     local app="$1"
+    if mj_is_app "$app"; then
+        mj_app_help "$app"
+    else
+        mj_unknown_app "$app"
+        exit 1
+    fi
+}
 
-    case "$app" in
-        mail)
-            echo -e "${CYAN}macjuice mail${NC} - Email management"
-            echo ""
-            echo "Commands:"
-            echo "  accounts              List all mail accounts"
-            echo "  list [mailbox]        List recent emails (default: INBOX)"
-            echo "  search <query>        Search emails across ALL mailboxes"
-            echo "    Prefixes: from:, to:, subject:, body: (plain = all fields)"
-            echo "    --account <emails>  Filter to specific accounts (comma-separated)"
-            echo "  read <message-id>     Read a specific email"
-            echo "  attachments <id>      List attachments on a message"
-            echo "  save-attachments <id> <dir>  Save attachments to a directory"
-            echo "  send <to> <subj> <body>  Send an email"
-            echo "  draft <to> <subj> <body> Save a draft email"
-            echo "  html-draft <to> <subj> <html-file> Open a rich HTML email draft"
-            echo "  delete-draft <id>     Delete a draft by message ID"
-            echo "  reply <id> <body>     Reply to a message (saves as draft)"
-            echo "  forward <id> <to>     Forward a message (saves as draft)"
-            echo "  reset                 Kill stuck AppleScript handlers and restart Mail"
-            echo ""
-            echo "Draft options:"
-            echo "  --account <name>      Send from a specific account"
-            echo "  --cc <emails>         Add CC recipients (comma-separated)"
-            echo "  --bcc <emails>        Add BCC recipients (comma-separated)"
-            echo ""
-            echo "Reply options:"
-            echo "  --search <query>      Find message by subject/sender instead of ID"
-            echo "  --from <email>        Send from a specific account"
-            echo "  --cc <emails>         Add CC recipients (comma-separated)"
-            echo "  --bcc <emails>        Add BCC recipients (comma-separated)"
-            echo ""
-            echo "Forward options:"
-            echo "  --account <name>      Send from a specific account"
-            echo "  --cc <emails>         Add CC recipients (comma-separated)"
-            echo "  --bcc <emails>        Add BCC recipients (comma-separated)"
-            echo "  --body <text>         Prepend text above the forwarded content"
-            echo "  --attach <file>       Attach a file (repeatable for multiple files)"
-            ;;
-        notes)
-            echo -e "${CYAN}macjuice notes${NC} - Notes management"
-            echo ""
-            echo "Commands:"
-            echo "  list                  List all notes"
-            echo "  folders               List all folders"
-            echo "  create <title> <body> Create a new note"
-            echo "  read <title>          Read a note"
-            echo "  search <query>        Search notes"
-            ;;
-        calendar)
-            echo -e "${CYAN}macjuice calendar${NC} - Calendar management"
-            echo ""
-            echo "Commands:"
-            echo "  list                  List all calendars"
-            echo "  today                 Show today's events"
-            echo "  yesterday             Show yesterday's events"
-            echo "  week                  Show this week's events (next 7 days)"
-            echo "  upcoming [days]       Show upcoming events (default: 7 days)"
-            echo "  past [days]           Show past events (default: 7 days)"
-            echo "  search <query>        Search events"
-            echo "  create <title> <date> <duration> [calendar]"
-            echo "                        Create an event"
-            echo "  delete <title>        Delete an event"
-            ;;
-        messages)
-            echo -e "${CYAN}macjuice messages${NC} - iMessage/SMS"
-            echo ""
-            echo "Commands:"
-            echo "  chats                 List all chats"
-            echo "  send <to> <message>   Send a message (phone, email, or contact name)"
-            echo "  read <chat> [count]   Read messages from a chat"
-            echo "  recent [count]        Show recent messages"
-            echo "  search <query>        Search messages"
-            ;;
-        music)
-            echo -e "${CYAN}macjuice music${NC} - Apple Music control"
-            echo ""
-            echo "Commands:"
-            echo "  play [playlist]       Start playback (optionally from a playlist)"
-            echo "  open <query>          Search Apple Music catalog and play a song"
-            echo "  pause                 Pause playback"
-            echo "  toggle                Toggle play/pause"
-            echo "  next                  Next track"
-            echo "  previous              Previous track"
-            echo "  now                   Show current track"
-            echo "  volume [level]        Get/set volume (0-100)"
-            echo "  playlists             List playlists"
-            echo "  search <query>        Search library"
-            ;;
-        contacts)
-            echo -e "${CYAN}macjuice contacts${NC} - Contacts management"
-            echo ""
-            echo "Commands:"
-            echo "  list                  List contacts"
-            echo "  search <query>        Search contacts"
-            echo "  show <name>           Show contact details"
-            echo "  groups                List contact groups"
-            echo "  add <first> <last> [email] [phone]"
-            echo "                        Add a new contact"
-            echo "  email <name>          Get contact's email"
-            echo "  phone <name>          Get contact's phone"
-            ;;
-        reminders)
-            echo -e "${CYAN}macjuice reminders${NC} - Reminders management"
-            echo ""
-            echo "Commands:"
-            echo "  lists                 List all reminder lists"
-            echo "  list [listname]       List reminders in a list"
-            echo "  all                   List all incomplete reminders"
-            echo "  today                 List reminders due today"
-            echo "  overdue               List overdue reminders"
-            echo "  add <title> [list] [due]"
-            echo "                        Add a reminder"
-            echo "  complete <title>      Mark reminder as complete"
-            echo "  delete <title>        Delete a reminder"
-            echo "  search <query>        Search reminders"
-            ;;
-        photos)
-            echo -e "${CYAN}macjuice photos${NC} - Apple Photos"
-            echo ""
-            echo "Commands:"
-            echo "  recent [count] [--since <date>]"
-            echo "                        List recent photos (default: 20)"
-            echo "  search <query>        Search all fields (filename, title, OCR, people, keywords)"
-            echo "  search person:<name>  Search by person/face name"
-            echo "  search keyword:<tag>  Search by keyword tag"
-            echo "  search ocr:<text>     Search OCR text in photos"
-            echo "  search text:<query>   Search filename, title, description only"
-            echo "  search <query> --since <date>"
-            echo "                        Filter by date (YYYY-MM-DD, today, yesterday, 3d, 1w, 2m)"
-            echo "  people                List all named people in library"
-            echo "  keywords              List all keywords in library"
-            echo "  albums                List all albums"
-            echo "  export <query> <dir>  Export matching photos to a folder"
-            echo "  export-recent <n> <dir>  Export N recent photos"
-            ;;
-        shortcuts)
-            echo -e "${CYAN}macjuice shortcuts${NC} - Run macOS Shortcuts"
-            echo ""
-            echo "Commands:"
-            echo "  list                  List all shortcuts"
-            echo "  run <name>            Run a shortcut by name"
-            echo "  search <query>        Search shortcuts by name"
-            echo ""
-            echo "Run any shortcut you've created in the Shortcuts app."
-            echo "First run will prompt for Automation permission."
-            ;;
-        home)
-            echo -e "${CYAN}macjuice home${NC} - HomeKit control (via Shortcuts)"
-            echo ""
-            echo "Commands:"
-            echo "  list                  List HomeKit shortcuts"
-            echo "  run <shortcut>        Run a HomeKit shortcut"
-            echo "  setup                 Set up HomeKit shortcuts"
-            echo ""
-            echo "HomeKit has no direct CLI access, so macjuice uses Shortcuts"
-            echo "as a bridge. Create shortcuts in the Shortcuts app that control"
-            echo "your HomeKit devices, then run them here."
-            echo ""
-            echo "See: macjuice home setup"
-            ;;
-        *)
-            echo -e "${RED}Error:${NC} Unknown app: $app"
-            echo "Run 'macjuice --help' for available apps."
-            exit 1
-            ;;
-    esac
+# help [<app> [<command>]] - same text as --help
+run_help() {
+    if [[ $# -eq 0 ]]; then
+        show_help
+    elif ! mj_is_app "$1"; then
+        mj_unknown_app "$1"
+        exit 1
+    elif [[ $# -eq 1 ]]; then
+        mj_app_help "$1"
+    elif [[ -n "$(mj_reg_line "$1" "$2")" ]]; then
+        mj_cmd_help "$1" "$2"
+    else
+        mj_unknown_cmd "$1" "$2"
+        exit 1
+    fi
 }
 
 # Main entry point
@@ -305,14 +129,24 @@ main() {
         exit 0
     fi
 
-    # Handle global flags
+    # Handle global flags and commands
     case "$1" in
         --help|-h)
             show_help
             exit 0
             ;;
+        help)
+            shift
+            run_help "$@"
+            exit 0
+            ;;
         --version|-v)
             show_version
+            exit 0
+            ;;
+        --list-commands)
+            # Used by tests/test_help.sh: one "app command" per line
+            mj_registry | cut -d'|' -f1,2 | tr '|' ' '
             exit 0
             ;;
     esac
@@ -321,15 +155,56 @@ main() {
     local app="$1"
     shift
 
-    # Handle app-specific help
+    if ! mj_is_app "$app"; then
+        mj_unknown_app "$app"
+        exit 1
+    fi
+
+    # App-level help: no command, --help/-h, or "help [command]"
     if [[ $# -eq 0 ]] || [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
         show_app_help "$app"
+        exit 0
+    fi
+    if [[ "$1" == "help" ]]; then
+        shift
+        run_help "$app" "$@"
         exit 0
     fi
 
     # Get the command
     local cmd="$1"
     shift
+
+    # facetime <number-or-email> is a shortcut for facetime call
+    if [[ "$app" != "facetime" ]]; then
+        if [[ -z "$(mj_reg_line "$app" "$cmd")" ]] && [[ "$cmd" != "setup-check" ]]; then
+            mj_unknown_cmd "$app" "$cmd"
+            exit 1
+        fi
+    fi
+
+    # Command-level help: --help or -h anywhere after the command
+    local arg
+    for arg in "$@"; do
+        if [[ "$arg" == "--help" ]] || [[ "$arg" == "-h" ]]; then
+            if [[ "$app" == "facetime" ]] && [[ -z "$(mj_reg_line "$app" "$cmd")" ]]; then
+                mj_cmd_help facetime call
+            else
+                mj_cmd_help "$app" "$cmd"
+            fi
+            exit 0
+        fi
+    done
+
+    # Missing required arguments: short error that points at the help
+    if [[ -n "$(mj_reg_line "$app" "$cmd")" ]]; then
+        local need
+        need="$(mj_reg_line "$app" "$cmd" | cut -d'|' -f3)"
+        if [[ $# -lt $need ]]; then
+            mj_missing_args "$app" "$cmd" "$#"
+            exit 1
+        fi
+    fi
 
     # Route to the appropriate AppleScript
     case "$app" in

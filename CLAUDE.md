@@ -146,7 +146,7 @@ macjuice reminders list "Groceries"        # List reminders in a specific list
 macjuice reminders all                     # All incomplete reminders
 macjuice reminders today                   # Reminders due today
 macjuice reminders overdue                 # Overdue reminders
-macjuice reminders add "Buy milk" "Groceries" "tomorrow 5pm"
+macjuice reminders add "Buy milk" "Groceries" tomorrow   # due: today, tomorrow, 5pm, next week, or a date
 macjuice reminders complete "Buy milk"     # Mark as complete
 macjuice reminders delete "Buy milk"       # Delete a reminder
 macjuice reminders search "milk"           # Search reminders
@@ -166,7 +166,7 @@ Requires Shortcuts app. HomeKit has no AppleScript support, so this works via pr
 
 ```bash
 macjuice facetime "+15551234567"           # Video call
-macjuice facetime "user@icloud.com" audio  # Audio-only call
+macjuice facetime audio "user@icloud.com"  # Audio-only call
 ```
 
 ## Architecture
@@ -175,6 +175,7 @@ macjuice facetime "user@icloud.com" audio  # Audio-only call
 macjuice/
 ├── macjuice                  # Main bash entry point - routes commands to scripts
 ├── scripts/
+│   ├── help.sh               # ALL help text + command registry (sourced; never calls osascript)
 │   ├── mail.applescript      # Mail: list, search, read, send, draft, reply, delete-draft
 │   ├── calendar.applescript  # Calendar: today, week, upcoming, search, create, delete
 │   ├── notes.applescript     # Notes: list, folders, create, read, search
@@ -186,9 +187,13 @@ macjuice/
 │   ├── home-setup.sh         # HomeKit shortcuts installer
 │   └── shortcuts/            # Preloaded .shortcut files for HomeKit
 ├── lib/                      # Shared utilities (unused currently)
-├── tests/                    # Test scripts per app
+├── tests/                    # Test scripts per app (test_help.sh checks every command has full help)
 └── install.sh                # Adds macjuice to PATH
 ```
+
+## Help system (keep it complete)
+
+Help lives in `scripts/help.sh`. When you add or change a command: add it to `mj_registry` (app|command|min-args|usage|summary), add its Arguments/Options/Examples block to `mj_cmd_body`, then run `bash tests/test_help.sh`. The test fails if any command lacks an Examples section or any `<argument>`/`--flag` in its usage line lacks a description. Use placeholder data only (example.com, contoso.com, fabrikam.com, "Jane Doe", +1555555xxxx). Bash 3.2 compatible (no associative arrays).
 
 ## How It Works
 

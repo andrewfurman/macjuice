@@ -31,74 +31,71 @@ cd macjuice
 ## Usage
 
 ```bash
-# Mail
-macjuice mail list                          # List recent emails
-macjuice mail search "insurify"                  # All fields, all mailboxes
-macjuice mail search "from:boss"                 # Sender only (fast)
-macjuice mail search "subject:urgent"            # Subject only (fast)
-macjuice mail search "body:contract"             # Body content search
-macjuice mail search "insurify" --account me@gmail.com  # Specific account
-macjuice mail send "user@example.com" "Subject" "Body"
-macjuice mail draft "user@example.com" "Subject" "Body"      # Save as draft
-macjuice mail html-draft "to@x.com" "Subject" report.html   # HTML draft from file
-macjuice mail html-draft "to@x.com" "Subject" "<h1>Hi</h1>" # HTML draft from string
-macjuice mail forward <message-id> "user@example.com"        # Forward a message (draft)
-macjuice mail forward <id> "to@x.com" --body="See below"    # Forward with body prepended
-macjuice mail forward <id> "to@x.com" --cc=a@x.com --from=me@icloud.com  # Forward with CC/from
-macjuice mail accounts                      # List all mail accounts
+macjuice <app> <command> [arguments]
+```
 
-# Notes
-macjuice notes list                         # List all notes
-macjuice notes create "Title" "Content"
-macjuice notes search "meeting"
-macjuice notes read "Note Title"
+### Getting help
+
+Every level has built-in help with copy-pasteable examples. Help works anywhere (it never calls AppleScript).
+
+```bash
+macjuice --help                  # All apps, common examples, safety notes
+macjuice mail --help             # Every command of one app
+macjuice mail send --help        # One command: each argument, defaults, examples
+macjuice help mail send          # Same as the line above
+```
+
+`-h` and `--help` print the same text. A missing argument or unknown command prints a short error, a usage line, an example, and the `--help` command to run next.
+
+**Safety:** there is no `--yes` flag and no confirmation prompt. `mail send`, `messages send`, `calendar delete`, `reminders delete`, `mail delete-draft` and `shortcuts run` act immediately. Use `mail draft` to review an email before sending.
+
+### Common tasks
+
+```bash
+# Mail
+macjuice mail accounts                                   # Addresses you can use with --from
+macjuice mail list                                       # Recent inbox messages (IDs in the first column)
+macjuice mail search "from:jane@example.com"             # Prefixes: from:, to:, subject:, body:
+macjuice mail search "invoice" --account jane@contoso.com
+macjuice mail read 12345                                 # Read one message by ID
+macjuice mail draft "jane@example.com" "Lunch?" "Free at noon?" --from=me@contoso.com
+macjuice mail reply 12345 "Thanks!"                      # Reply-all, saved as a draft
+macjuice mail forward 12345 "jane@example.com" --body="FYI" --cc=bob@fabrikam.com
+macjuice mail attach 12345 /tmp/report.pdf               # Attach to an existing draft
+macjuice mail send "jane@example.com" "Hi" "Body"        # Sends immediately
 
 # Calendar
-macjuice calendar today                     # Today's events
-macjuice calendar week                      # This week's events
-macjuice calendar create "Meeting" "2024-02-01 10:00" "1 hour"
-macjuice calendar list                      # List all calendars
+macjuice calendar today                                  # Also: yesterday, week, upcoming 14, past 7
+macjuice calendar search "dentist" --future=30
+macjuice calendar create "Team sync" "2026-03-01 14:00" 30m "Work"
+macjuice calendar delete "Team sync"                     # Deletes immediately
 
-# Messages (reads via SQLite — instant!)
-macjuice messages chats                     # List all chats with last message
-macjuice messages recent                    # Recent messages across all chats
-macjuice messages read "+15551234567"       # Read messages from a chat
-macjuice messages read "John Doe" 50        # Last 50 messages from contact
-macjuice messages search "dinner"           # Search all message text
-macjuice messages send "+15551234567" "Hello!"  # Send via AppleScript
-macjuice messages info                      # Database stats
+# Messages (reads via SQLite, needs Full Disk Access)
+macjuice messages chats
+macjuice messages read "Jane Doe" 50
+macjuice messages search "dinner"
+macjuice messages send "+15555550123" "Hello!"           # Sends immediately
 
-# Music
-macjuice music play
-macjuice music pause
-macjuice music next
-macjuice music now                          # Current track info
-macjuice music search "artist:Beatles"
+# Notes, Reminders, Contacts
+macjuice notes create "Shopping list" "Milk, eggs, bread"
+macjuice notes read "Shopping list"
+macjuice reminders add "Buy milk" "Groceries" tomorrow   # due: today, tomorrow, 5pm, next week, a date
+macjuice reminders complete "Buy milk"
+macjuice contacts add "Jane" "Doe" "jane@example.com" "+15555550123"
+macjuice contacts email "Jane Doe"
 
-# Photos
-macjuice photos albums                      # List all albums
-macjuice photos list "Album Name"           # Photos in album
-macjuice photos export "Album Name" ~/Desktop/export
+# Music and Photos
+macjuice music open "Yesterday by The Beatles"           # Search the Apple Music catalog and play
+macjuice music volume 40
+macjuice photos recent 10 --since 1w
+macjuice photos search person:Jane --since 2026-03-09
+macjuice photos export "beach" ~/Desktop/beach-photos
 
-# Reminders
-macjuice reminders list
-macjuice reminders create "Buy groceries" --due "tomorrow 5pm"
-macjuice reminders complete "Buy groceries"
-
-# Contacts
-macjuice contacts search "John"
-macjuice contacts show "John Doe"
-
-# Home (HomeKit via Shortcuts)
-macjuice home setup                         # Install preloaded shortcuts
-macjuice home list                          # List available scenes/devices
-macjuice home run "Good Night"              # Run a scene
-macjuice home "Living Room Lights" off
-macjuice home "Thermostat" 72
-
-# FaceTime
-macjuice facetime "+15551234567"            # Start video call
-macjuice facetime "user@icloud.com" --audio # Audio only
+# Shortcuts, Home, FaceTime
+macjuice shortcuts run "Morning Routine"
+macjuice home setup                                      # Install preloaded HomeKit shortcuts
+macjuice home run "homekit-lock-doors"
+macjuice facetime audio "+15555550123"                   # Or: facetime call <number-or-email>
 ```
 
 ## HTML Email Drafts
@@ -220,16 +217,7 @@ Done! Run 'macjuice home list' to see available commands.
 
 ## Output Formats
 
-```bash
-# Default: Human-readable
-macjuice mail list
-
-# JSON output (for scripting)
-macjuice mail list --json
-
-# Quiet mode (minimal output)
-macjuice mail send "user@example.com" "Subject" "Body" --quiet
-```
+Output is plain text, meant to be read in the terminal or piped to other tools (for example `macjuice contacts email "Jane Doe" | pbcopy`). There is no JSON or quiet mode yet.
 
 ## Configuration
 

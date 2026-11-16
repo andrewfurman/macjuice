@@ -12,10 +12,10 @@ assert_output_matches \
     "macjuice v[0-9]" \
     "$MACJUICE" --version
 
-# 2. --help lists available apps
+# 2. --help lists apps
 assert_output_matches \
-    "--help lists available apps" \
-    "Available apps:" \
+    "--help lists apps" \
+    "Apps:" \
     "$MACJUICE" --help
 
 # 3. app-specific help lists commands
